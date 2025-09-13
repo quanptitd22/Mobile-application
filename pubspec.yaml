@@ -83,7 +83,7 @@ flutter:
   - family: Montserrat
     fonts:
          - asset: assets/fonts/Montserrat-Black.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
+         - asset: assets/fonts/Roboto_SemiCondensed-Italic.ttf
   #         weight: 700
   #
   # For details regarding fonts from package dependencies,
