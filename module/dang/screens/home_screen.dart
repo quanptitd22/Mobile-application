@@ -3,9 +3,55 @@ import '../widgets/manage_card.dart';
 import '../widgets/prescription_card.dart';
 import '../widgets/reminder_tile.dart';
 import 'reminder_screen.dart';
+import 'history_screen.dart';
+import '../models/reminder_storage.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<Reminder> reminders = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReminders();
+  }
+
+  Future<void> _loadReminders() async {
+    final data = await ReminderStorage.loadReminders();
+    setState(() {
+      reminders = data;
+    });
+  }
+
+  Future<void> _addReminder() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ReminderScreen()),
+    );
+
+    if (result != null && result is Reminder) {
+      // 👉 Lưu reminder (dùng ReminderStorage luôn)
+      await ReminderStorage.saveReminder(result);
+      await _loadReminders();
+    }
+  }
+
+  Future<void> _deleteReminder(Reminder reminder) async {
+    await ReminderStorage.deleteReminder(reminder.id);
+    await _loadReminders();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Đã xóa reminder")),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +81,7 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search
+            // 🔍 Search
             TextField(
               decoration: InputDecoration(
                 hintText: "Search medications, schedules...",
@@ -50,14 +96,32 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // Upcoming reminders
+            // ⏰ Upcoming reminders
             sectionHeader("Upcoming reminders"),
-            const ReminderTile("Morning medications", "8 AM"),
-            const SizedBox(height: 10),
-            const ReminderTile("Evening medications", "6 PM"),
+            reminders.isEmpty
+                ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text("No reminders yet"),
+              ),
+            )
+                : Column(
+              children: reminders.map((reminder) {
+                return Dismissible(
+                  key: Key(reminder.id),
+                  onDismissed: (_) => _deleteReminder(reminder),
+                  background: Container(color: Colors.red),
+                  child: ReminderTile(
+                    title: reminder.title,
+                    time:
+                    "${reminder.time.hour.toString().padLeft(2, '0')}:${reminder.time.minute.toString().padLeft(2, '0')}",
+                  ),
+                );
+              }).toList(),
+            ),
             const SizedBox(height: 20),
 
-            // Current prescriptions
+            // 💊 Current prescriptions
             sectionHeader("Current prescriptions"),
             const SizedBox(height: 10),
             Row(
@@ -70,7 +134,7 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // Manage medications
+            // 📋 Manage medications
             sectionHeader("Manage your medications"),
             const SizedBox(height: 10),
             GridView.count(
@@ -80,20 +144,31 @@ class HomeScreen extends StatelessWidget {
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
               children: [
-                const ManageCard(Icons.schedule, "Scheduled"),
-                const ManageCard(Icons.history, "History"),
-                const ManageCard(Icons.info, "Medication"),
+                // Scheduled
+                GestureDetector(
+                  onTap: () {
+                    // 👉 Có thể mở màn hình quản lý Scheduled
+                  },
+                  child: const ManageCard(Icons.schedule, "Scheduled"),
+                ),
 
-                // 👉 Nhấn vào đây để mở màn hình setup
+                // History
                 GestureDetector(
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const ReminderScreen(),
-                      ),
+                          builder: (context) => const HistoryScreen()),
                     );
                   },
+                  child: const ManageCard(Icons.history, "History"),
+                ),
+
+                const ManageCard(Icons.info, "Medication"),
+
+                // 👉 Nhấn vào đây để mở màn hình setup
+                GestureDetector(
+                  onTap: _addReminder,
                   child: const ManageCard(Icons.notifications, "Set"),
                 ),
 
