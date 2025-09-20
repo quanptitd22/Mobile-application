@@ -12,7 +12,20 @@
           "package_name": "com.example.medireminder_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "481308140097-eeef0h7568mi7u7duihb30t7tber583u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.medireminder_app",
+            "certificate_hash": "a9543256835ad2f7155bd137c696ea453fedebfc"
+          }
+        },
+        {
+          "client_id": "481308140097-gdmmhikujqk3d3lfvnhtdsp6nrkqsir5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA7-X5Wr3cu5tDN4TNgD492tx-N4hHR0fM"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "481308140097-gdmmhikujqk3d3lfvnhtdsp6nrkqsir5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

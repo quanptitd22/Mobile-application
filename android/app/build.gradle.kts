@@ -46,3 +46,16 @@ dependencies {
     // Kotlin DSL: core library desugaring
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
 }
+dependencies {
+    // Import the Firebase BoM (Bill of Materials)
+    implementation(platform("com.google.firebase:firebase-bom:34.3.0"))
+
+    // Firebase Analytics
+    implementation("com.google.firebase:firebase-analytics")
+
+    // Nếu muốn dùng thêm Firebase khác thì bỏ comment:
+    // implementation("com.google.firebase:firebase-auth")
+    // implementation("com.google.firebase:firebase-firestore")
+    // implementation("com.google.firebase:firebase-database")
+    // implementation("com.google.firebase:firebase-messaging")
+}
