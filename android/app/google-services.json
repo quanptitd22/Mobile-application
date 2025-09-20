@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "481308140097",
+    "project_id": "iotmedicalbox",
+    "storage_bucket": "iotmedicalbox.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:481308140097:android:53b8d7173dfaf2c3831cc0",
+        "android_client_info": {
+          "package_name": "com.example.medireminder_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7-X5Wr3cu5tDN4TNgD492tx-N4hHR0fM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
