@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 
 class ManageCard extends StatelessWidget {
   final IconData icon;
-  final String title;
+  final String label;
 
-  const ManageCard(this.icon, this.title, {super.key});
+  const ManageCard(this.icon, this.label, {super.key});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.grey[200],
         borderRadius: BorderRadius.circular(12),
@@ -17,11 +16,21 @@ class ManageCard extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 30, color: Colors.black87),
+          Icon(
+            icon,
+            size: 32,
+            color: Colors.grey[700],
+          ),
           const SizedBox(height: 8),
-          Text(title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );

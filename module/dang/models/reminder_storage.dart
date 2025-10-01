@@ -1,101 +1,85 @@
-// module/models/reminder_storage.dart
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Model class for a Reminder
 class Reminder {
   final String id;
   final String title;
   final DateTime time;
+  final String? description;
 
   Reminder({
     required this.id,
     required this.title,
     required this.time,
+    this.description,
   });
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'time': time.toIso8601String(),
-  };
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'time': time.toIso8601String(),
+      'description': description,
+    };
+  }
 
-  static Reminder fromJson(Map<String, dynamic> json) => Reminder(
-    id: json['id'],
-    title: json['title'],
-    time: DateTime.parse(json['time']),
-  );
+  factory Reminder.fromJson(Map<String, dynamic> json) {
+    return Reminder(
+      id: json['id'],
+      title: json['title'],
+      time: DateTime.parse(json['time']),
+      description: json['description'],
+    );
+  }
 }
 
-/// Storage class for handling reminders with SharedPreferences
 class ReminderStorage {
-  static const _key = 'reminders';
+  static const String _key = 'reminders';
 
-  /// Load all reminders from SharedPreferences
   static Future<List<Reminder>> loadReminders() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getStringList(_key) ?? [];
-      return data.map((e) => Reminder.fromJson(jsonDecode(e))).toList();
+      final String? jsonString = prefs.getString(_key);
+
+      if (jsonString == null) return [];
+
+      final List<dynamic> jsonList = json.decode(jsonString);
+      return jsonList.map((json) => Reminder.fromJson(json)).toList();
     } catch (e) {
-      print('Error loading reminders: $e');
       return [];
     }
   }
 
-  /// Save a new reminder
   static Future<void> saveReminder(Reminder reminder) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final reminders = await loadReminders();
-      reminders.add(reminder);
+    final reminders = await loadReminders();
+    reminders.add(reminder);
+    await _saveReminders(reminders);
+  }
 
-      final data = reminders.map((r) => jsonEncode(r.toJson())).toList();
-      await prefs.setStringList(_key, data);
-    } catch (e) {
-      print('Error saving reminder: $e');
+  static Future<void> updateReminder(Reminder updatedReminder) async {
+    final reminders = await loadReminders();
+    final index = reminders.indexWhere((r) => r.id == updatedReminder.id);
+    if (index != -1) {
+      reminders[index] = updatedReminder;
+      await _saveReminders(reminders);
     }
   }
 
-  /// Update a reminder by id
-  static Future<void> updateReminder(Reminder updated) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final reminders = await loadReminders();
-
-      final index = reminders.indexWhere((r) => r.id == updated.id);
-      if (index != -1) {
-        reminders[index] = updated;
-        final data = reminders.map((r) => jsonEncode(r.toJson())).toList();
-        await prefs.setStringList(_key, data);
-      }
-    } catch (e) {
-      print('Error updating reminder: $e');
-    }
-  }
-
-  /// Delete a reminder by id
   static Future<void> deleteReminder(String id) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final reminders = await loadReminders();
-
-      reminders.removeWhere((r) => r.id == id);
-
-      final data = reminders.map((r) => jsonEncode(r.toJson())).toList();
-      await prefs.setStringList(_key, data);
-    } catch (e) {
-      print('Error deleting reminder: $e');
-    }
+    final reminders = await loadReminders();
+    reminders.removeWhere((r) => r.id == id);
+    await _saveReminders(reminders);
   }
 
-  /// Clear all reminders
-  static Future<void> clearAll() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_key);
-    } catch (e) {
-      print('Error clearing reminders: $e');
-    }
+  static Future<void> deleteReminders(List<String> ids) async {
+    final reminders = await loadReminders();
+    reminders.removeWhere((r) => ids.contains(r.id));
+    await _saveReminders(reminders);
+  }
+
+  static Future<void> _saveReminders(List<Reminder> reminders) async {
+    final prefs = await SharedPreferences.getInstance();
+    final String jsonString = json.encode(reminders.map((r) => r.toJson()).toList());
+    await prefs.setString(_key, jsonString);
   }
 }
