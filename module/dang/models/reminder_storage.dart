@@ -2,33 +2,51 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Reminder {
-  final String id;
-  final String title;
-  final DateTime time;
-  final String? description;
+  String id;
+  String title;
+  String description;
+  int dosage;             // số lượng thuốc
+  DateTime time;          // thời gian uống
+  String frequency;       // ví dụ: "Hằng ngày", "X ngày 1 lần"
+  int intervalDays;       // số ngày cách quãng
+  DateTime? endDate;      // ngày kết thúc (có thể null)
 
   Reminder({
     required this.id,
     required this.title,
+    required this.description,
+    required this.dosage,
     required this.time,
-    this.description,
+    this.frequency = "Hằng ngày",
+    this.intervalDays = 1,
+    this.endDate,
   });
 
+  /// Chuyển sang JSON để lưu
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'title': title,
-      'time': time.toIso8601String(),
       'description': description,
+      'dosage': dosage,
+      'time': time.toIso8601String(),
+      'frequency': frequency,
+      'intervalDays': intervalDays,
+      'endDate': endDate?.toIso8601String(),
     };
   }
 
+  /// Parse từ JSON ra object
   factory Reminder.fromJson(Map<String, dynamic> json) {
     return Reminder(
       id: json['id'],
       title: json['title'],
-      time: DateTime.parse(json['time']),
       description: json['description'],
+      dosage: json['dosage'],
+      time: DateTime.parse(json['time']),
+      frequency: json['frequency'] ?? "Hằng ngày",
+      intervalDays: json['intervalDays'] ?? 1,
+      endDate: json['endDate'] != null ? DateTime.parse(json['endDate']) : null,
     );
   }
 }
@@ -36,6 +54,7 @@ class Reminder {
 class ReminderStorage {
   static const String _key = 'reminders';
 
+  /// Load danh sách reminders từ SharedPreferences
   static Future<List<Reminder>> loadReminders() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -50,12 +69,14 @@ class ReminderStorage {
     }
   }
 
+  /// Thêm reminder mới
   static Future<void> saveReminder(Reminder reminder) async {
     final reminders = await loadReminders();
     reminders.add(reminder);
     await _saveReminders(reminders);
   }
 
+  /// Cập nhật reminder
   static Future<void> updateReminder(Reminder updatedReminder) async {
     final reminders = await loadReminders();
     final index = reminders.indexWhere((r) => r.id == updatedReminder.id);
@@ -65,21 +86,25 @@ class ReminderStorage {
     }
   }
 
+  /// Xoá reminder theo id
   static Future<void> deleteReminder(String id) async {
     final reminders = await loadReminders();
     reminders.removeWhere((r) => r.id == id);
     await _saveReminders(reminders);
   }
 
+  /// Xoá nhiều reminders
   static Future<void> deleteReminders(List<String> ids) async {
     final reminders = await loadReminders();
     reminders.removeWhere((r) => ids.contains(r.id));
     await _saveReminders(reminders);
   }
 
+  /// Lưu danh sách reminders xuống SharedPreferences
   static Future<void> _saveReminders(List<Reminder> reminders) async {
     final prefs = await SharedPreferences.getInstance();
-    final String jsonString = json.encode(reminders.map((r) => r.toJson()).toList());
+    final String jsonString =
+    json.encode(reminders.map((r) => r.toJson()).toList());
     await prefs.setString(_key, jsonString);
   }
 }
