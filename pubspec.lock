@@ -198,7 +198,11 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.2.0"
-<<<<<<< HEAD
+  flutter_localizations:
+    dependency: "direct main"
+    description: flutter
+    source: sdk
+    version: "0.0.0"
   flutter_signin_button:
     dependency: "direct main"
     description:
@@ -207,13 +211,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.1"
-=======
-  flutter_localizations:
-    dependency: "direct main"
-    description: flutter
-    source: sdk
-    version: "0.0.0"
->>>>>>> de7cb991050e1b2ce2ea74923932b1353d2f9176
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -396,10 +393,10 @@ packages:
     dependency: transitive
     description:
       name: shared_preferences_android
-      sha256: a2608114b1ffdcbc9c120eb71a0e207c71da56202852d4aab8a5e30a82269e74
+      sha256: "0b0f98d535319cb5cdd4f65783c2a54ee6d417a2f093dbb18be3e36e4c3d181f"
       url: "https://pub.dev"
     source: hosted
-    version: "2.4.12"
+    version: "2.4.14"
   shared_preferences_foundation:
     dependency: transitive
     description:
@@ -567,4 +564,4 @@ packages:
     version: "6.6.1"
 sdks:
   dart: ">=3.9.2 <4.0.0"
-  flutter: ">=3.29.0"
+  flutter: ">=3.35.0"
