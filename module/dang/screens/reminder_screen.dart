@@ -1,292 +1,603 @@
 import 'package:flutter/material.dart';
 import '../models/reminder_storage.dart';
-import '../services/notification_service.dart';
 
 class ReminderScreen extends StatefulWidget {
-  const ReminderScreen({super.key});
+  final Reminder? existingReminder;
+
+  const ReminderScreen({super.key, this.existingReminder});
 
   @override
   State<ReminderScreen> createState() => _ReminderScreenState();
 }
 
 class _ReminderScreenState extends State<ReminderScreen> {
-  final TextEditingController _medicineController =
-  TextEditingController(text: "Ibuprofen");
-  final TextEditingController _amountController =
-  TextEditingController(text: "2");
-  final TextEditingController _durationController =
-  TextEditingController(text: "10");
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
 
-  String unit = "Capsule";
-  bool afterMeal = true;
-  bool beforeMeal = false;
-  String durationUnit = "Days";
+  List<DateTime> _times = [];
+  int _selectedQuantity = 1;
+  String _selectedUnit = 'viên';
 
-  TimeOfDay? _selectedTime;
+  // 🆕 Tần suất
+  String _selectedFrequency = 'Hằng ngày';
+  final List<String> _frequencies = ['Hằng ngày', 'Cách ngày', 'Một lần', 'Theo số ngày'];
+  int _intervalDays = 2;   // cho "cách ngày"
+  int _durationDays = 7;   // cho "theo số ngày"
+
+  final List<String> _units = ['viên', 'ml', 'lọ', 'gói'];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existingReminder != null) {
+      _titleController.text = widget.existingReminder!.title;
+      _descriptionController.text = widget.existingReminder!.description ?? '';
+
+      // Giờ chỉ còn 1 time, cho vào list để tái sử dụng logic cũ
+      _times = [widget.existingReminder!.time];
+
+      // Liều lượng (dosage) là số nguyên, không còn đơn vị riêng
+      _selectedQuantity = widget.existingReminder!.dosage;
+      _selectedUnit = "viên"; // Hoặc mặc định "ml", tuỳ bạn muốn
+
+      // Tần suất
+      _selectedFrequency = widget.existingReminder!.frequency ?? 'Hằng ngày';
+      _intervalDays = widget.existingReminder!.intervalDays ?? 2;
+
+      // Tính số ngày từ endDate (nếu có), mặc định 7 ngày
+      _durationDays = widget.existingReminder!.endDate != null
+          ? widget.existingReminder!.endDate!
+          .difference(DateTime.now())
+          .inDays
+          : 7;
+    } else {
+      _times = [DateTime.now().add(const Duration(hours: 1))];
+    }
+  }
 
   @override
   void dispose() {
-    _medicineController.dispose();
-    _amountController.dispose();
-    _durationController.dispose();
+    _titleController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
-  void _pickTime() async {
-    final picked = await showTimePicker(
+  Future<void> _selectTime(int index) async {
+    final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: TimeOfDay.fromDateTime(_times[index]),
     );
-    if (picked != null) {
+
+    if (time != null) {
       setState(() {
-        _selectedTime = picked;
+        _times[index] = DateTime(
+          _times[index].year,
+          _times[index].month,
+          _times[index].day,
+          time.hour,
+          time.minute,
+        );
       });
     }
   }
 
-  Future<void> _saveReminder() async {
-    if (_medicineController.text.isEmpty ||
-        _amountController.text.isEmpty ||
-        _durationController.text.isEmpty ||
-        _selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Vui lòng nhập đầy đủ thông tin")),
-      );
+  void _addTime() {
+    setState(() {
+      _times.add(DateTime.now().add(const Duration(hours: 1)));
+    });
+  }
+
+  void _removeTime(int index) {
+    setState(() {
+      _times.removeAt(index);
+    });
+  }
+
+  void _saveReminder() {
+    if (_titleController.text.trim().isEmpty) {
+      _showErrorSnackBar('Vui lòng nhập tên thuốc');
       return;
     }
 
-    final now = DateTime.now();
-    final scheduledTime = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      _selectedTime!.hour,
-      _selectedTime!.minute,
-    );
+    if (_times.isEmpty) {
+      _showErrorSnackBar('Vui lòng chọn ít nhất 1 mốc giờ');
+      return;
+    }
 
     final reminder = Reminder(
-      id: DateTime.now().toIso8601String(),
-      title: "${_medicineController.text} (${_amountController.text} $unit)",
-      time: scheduledTime,
+      id: widget.existingReminder?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
+      dosage: _selectedQuantity, // số lượng uống
+      time: _times.first,        // lấy mốc giờ đầu tiên
+      frequency: _selectedFrequency,
+      intervalDays: _intervalDays,
+      endDate: DateTime.now().add(Duration(days: _durationDays)),
     );
 
-    // 1. Lưu vào storage
-    await ReminderStorage.saveReminder(reminder);
+    Navigator.pop(context, reminder);
+  }
 
-    // 2. Đặt thông báo
-    await NotificationService().scheduleNotification(
-      id: reminder.id.hashCode,
-      title: "Nhắc nhở uống thuốc",
-      body:
-      "Đến giờ uống ${_medicineController.text} (${_amountController.text} $unit) rồi!",
-      scheduledTime: scheduledTime,
-    );
-
-    // 3. Hiện dialog thành công -> OK -> trả reminder về HomeScreen
-    if (!mounted) return;
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          title: const Text("Thành công"),
-          content: const Text("Đã thêm thuốc thành công!"),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop(); // đóng dialog
-                Navigator.of(context).pop(reminder); // trả reminder về Home
-              },
-              child: const Text("OK"),
-            ),
-          ],
-        );
-      },
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        elevation: 0,
+        title: Text(
+          widget.existingReminder != null
+              ? 'Chỉnh sửa lịch trình'
+              : 'Thêm lịch trình mới',
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: true,
         backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "Set Medication Reminder",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
+        elevation: 0,
+        foregroundColor: Colors.black,
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            child: TextButton(
+              onPressed: _saveReminder,
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFF2196F3),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              ),
+              child: const Text(
+                'Lưu',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            /// Time Picker
-            Center(
-              child: InkWell(
-                onTap: _pickTime,
-                child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[200],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _selectedTime == null
-                        ? "SET"
-                        : "${_selectedTime!.hour.toString().padLeft(2, '0')} : ${_selectedTime!.minute.toString().padLeft(2, '0')}",
-                    style: const TextStyle(
-                        fontSize: 32, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            /// Medicine Name
-            const Text("Tên thuốc",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            TextField(
-              controller: _medicineController,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: "Medicine name",
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            /// Amount + Dropdown
-            Row(
+            // Medicine Info Card
+            _buildCard(
+              title: 'Thông tin thuốc',
+              icon: Icons.medication,
               children: [
-                Expanded(
-                  flex: 2,
-                  child: TextField(
-                    controller: _amountController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
+                _buildTextField(
+                  controller: _titleController,
+                  label: 'Tên thuốc',
+                  hint: 'VD: Paracetamol, Ibuprofen...',
+                  icon: Icons.medical_services,
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 3,
-                  child: DropdownButtonFormField(
-                    value: unit,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                    ),
-                    items: ["Capsule", "Tablet", "ml"]
-                        .map((e) =>
-                        DropdownMenuItem(value: e, child: Text(e)))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        unit = value.toString();
-                      });
-                    },
-                  ),
-                ),
+                const SizedBox(height: 16),
+                _buildQuantitySelector(),
               ],
             ),
+
             const SizedBox(height: 20),
 
-            /// Timing
-            const Text("Thời điểm uống",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            Row(
+            // 🆕 Frequency Card
+            _buildCard(
+              title: 'Tần suất uống',
+              icon: Icons.repeat,
               children: [
-                Checkbox(
-                  value: afterMeal,
-                  onChanged: (val) {
-                    setState(() {
-                      afterMeal = val!;
-                      if (afterMeal) beforeMeal = false;
-                    });
+                DropdownButton<String>(
+                  value: _selectedFrequency,
+                  isExpanded: true,
+                  items: _frequencies
+                      .map((f) => DropdownMenuItem(
+                    value: f,
+                    child: Text(f),
+                  ))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedFrequency = value);
+                    }
                   },
                 ),
-                const Text("After meal"),
-                Checkbox(
-                  value: beforeMeal,
-                  onChanged: (val) {
-                    setState(() {
-                      beforeMeal = val!;
-                      if (beforeMeal) afterMeal = false;
-                    });
-                  },
-                ),
-                const Text("Before meal"),
+                if (_selectedFrequency == 'Cách ngày') ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text('Mỗi'),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          onChanged: (val) {
+                            final parsed = int.tryParse(val);
+                            if (parsed != null && parsed > 0) {
+                              _intervalDays = parsed;
+                            }
+                          },
+                          controller: TextEditingController(text: _intervalDays.toString()),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('ngày'),
+                    ],
+                  ),
+                ],
+                if (_selectedFrequency == 'Theo số ngày') ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text('Trong'),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          onChanged: (val) {
+                            final parsed = int.tryParse(val);
+                            if (parsed != null && parsed > 0) {
+                              _durationDays = parsed;
+                            }
+                          },
+                          controller: TextEditingController(text: _durationDays.toString()),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('ngày'),
+                    ],
+                  ),
+                ],
               ],
             ),
+
             const SizedBox(height: 20),
 
-            /// Duration
-            const Text("Thời gian dùng",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            Row(
+            // Schedule Card
+            _buildCard(
+              title: 'Thời gian uống thuốc',
+              icon: Icons.schedule,
               children: [
-                Expanded(
-                  flex: 2,
-                  child: TextField(
-                    controller: _durationController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
+                Column(
+                  children: List.generate(_times.length, (index) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: _buildDateTimeButton(
+                            label: 'Giờ uống ${index + 1}',
+                            value:
+                            '${_times[index].hour.toString().padLeft(2, '0')}:${_times[index].minute.toString().padLeft(2, '0')}',
+                            icon: Icons.access_time,
+                            onTap: () => _selectTime(index),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => _removeTime(index),
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                        )
+                      ],
+                    );
+                  }),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 3,
-                  child: DropdownButtonFormField(
-                    value: durationUnit,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ElevatedButton.icon(
+                    onPressed: _addTime,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Thêm mốc giờ'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2196F3),
+                      foregroundColor: Colors.white,
                     ),
-                    items: ["Days", "Weeks", "Months"]
-                        .map((e) =>
-                        DropdownMenuItem(value: e, child: Text(e)))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        durationUnit = value.toString();
-                      });
-                    },
                   ),
+                )
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // Additional Notes Card
+            _buildCard(
+              title: 'Ghi chú thêm',
+              icon: Icons.note_add,
+              children: [
+                _buildTextField(
+                  controller: _descriptionController,
+                  label: 'Ghi chú',
+                  hint: 'Uống sau khi ăn, không uống với sữa...',
+                  icon: Icons.edit_note,
+                  maxLines: 3,
                 ),
               ],
             ),
-            const SizedBox(height: 20),
 
-            /// Save button
+            const SizedBox(height: 30),
+
+            // Save Button
             SizedBox(
               width: double.infinity,
+              height: 50,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Colors.blue[300],
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
                 onPressed: _saveReminder,
-                child: const Text(
-                  "Save Reminder",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2196F3),
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                ),
+                child: Text(
+                  widget.existingReminder != null
+                      ? 'Cập nhật lịch trình'
+                      : 'Tạo lịch trình',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  // Các widget phụ (card, textfield, quantity...)
+  Widget _buildCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2196F3).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: const Color(0xFF2196F3),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    int maxLines = 1,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          maxLines: maxLines,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: Colors.grey[400]),
+            prefixIcon: Icon(icon, color: Colors.grey[400]),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.grey[50],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuantitySelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Liều lượng',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: _selectedQuantity > 1
+                          ? () => setState(() => _selectedQuantity--)
+                          : null,
+                      icon: const Icon(Icons.remove_circle_outline),
+                      color: _selectedQuantity > 1
+                          ? const Color(0xFF2196F3)
+                          : Colors.grey,
+                    ),
+                    Expanded(
+                      child: Text(
+                        '$_selectedQuantity',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2196F3),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _selectedQuantity < 10
+                          ? () => setState(() => _selectedQuantity++)
+                          : null,
+                      icon: const Icon(Icons.add_circle_outline),
+                      color: _selectedQuantity < 10
+                          ? const Color(0xFF2196F3)
+                          : Colors.grey,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: DropdownButton<String>(
+                  value: _selectedUnit,
+                  isExpanded: true,
+                  underline: const SizedBox(),
+                  items: _units
+                      .map((unit) => DropdownMenuItem(
+                    value: unit,
+                    child: Text(unit),
+                  ))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedUnit = value);
+                    }
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateTimeButton({
+    required String label,
+    required String value,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: Colors.grey[400]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    value,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
+                const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
