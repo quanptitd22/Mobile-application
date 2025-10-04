@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'front_end/welcome_screen.dart';
 
+
 void main() {
   runApp(const MediReminderApp());
 }
