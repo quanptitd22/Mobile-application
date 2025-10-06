@@ -13,7 +13,7 @@ import 'reminder_screen.dart';
 // }
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({Key? key}) : super(key: key);
+  const HistoryScreen({super.key});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -80,7 +80,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
     if (_searchQuery.isNotEmpty) {
       result = result.where((reminder) {
         return reminder.title.toLowerCase().contains(_searchQuery) ||
-            (reminder.description?.toLowerCase().contains(_searchQuery) ?? false);
+            (reminder.description.toLowerCase().contains(_searchQuery) ?? false);
       }).toList();
     }
 
@@ -116,7 +116,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
 
     // Áp dụng bộ lọc ngày
     if (effectiveStartDate != null) {
-      result = result.where((r) => r.time.isAtSameMomentAs(effectiveStartDate!) || r.time.isAfter(effectiveStartDate!)).toList();
+      result = result.where((r) => r.time.isAtSameMomentAs(effectiveStartDate!) || r.time.isAfter(effectiveStartDate)).toList();
     }
     if (effectiveEndDate != null) {
       result = result.where((r) => r.time.isBefore(effectiveEndDate!)).toList();
@@ -761,10 +761,10 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                     ),
                   ],
                 ),
-                if (reminder.description != null && reminder.description!.isNotEmpty) ...[
+                if (reminder.description.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    reminder.description!,
+                    reminder.description,
                     style: TextStyle(
                       color: Colors.grey[500],
                       fontSize: 12,

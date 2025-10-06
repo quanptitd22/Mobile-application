@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart'; // THÊM IMPORT NÀY
-import 'screens/home_screen.dart'; // Hoặc màn hình gốc của bạn
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart'; // 👈 Thêm dòng này
+import 'screens/home_screen.dart';
+import 'package:medireminder_app/firebase_options.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // 👈 Cần có khi gọi async
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform, // 👈 Dành cho firebase_options.dart
+  );
   runApp(const MyApp());
 }
 
@@ -17,18 +23,17 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: false,
       ),
-      // THÊM CÁC THIẾT LẬP NÀY ĐỂ HỖ TRỢ LOCALIZATION
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [
-        Locale('en', 'US'), // Tiếng Anh
-        Locale('vi', 'VN'), // Tiếng Việt (Locale bạn đang dùng)
+        Locale('en', 'US'),
+        Locale('vi', 'VN'),
       ],
-      locale: const Locale('vi', 'VN'), // Đặt Locale mặc định là Tiếng Việt
-      home: const HomeScreen(), // Thay thế bằng màn hình gốc của bạn
+      locale: const Locale('vi', 'VN'),
+      home: const HomeScreen(),
     );
   }
 }

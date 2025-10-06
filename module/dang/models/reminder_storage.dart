@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/firebase_reminder_service.dart';
 
 class Reminder {
   String id;
@@ -74,6 +75,10 @@ class ReminderStorage {
     final reminders = await loadReminders();
     reminders.add(reminder);
     await _saveReminders(reminders);
+
+    // 🔹 Đồng bộ Firebase
+    final firebaseService = FirebaseReminderService();
+    await firebaseService.addReminder(reminder);
   }
 
   /// Cập nhật reminder
@@ -83,6 +88,10 @@ class ReminderStorage {
     if (index != -1) {
       reminders[index] = updatedReminder;
       await _saveReminders(reminders);
+
+      // 🔹 Cập nhật Firebase
+      final firebaseService = FirebaseReminderService();
+      await firebaseService.updateReminder(updatedReminder);
     }
   }
 
@@ -91,6 +100,10 @@ class ReminderStorage {
     final reminders = await loadReminders();
     reminders.removeWhere((r) => r.id == id);
     await _saveReminders(reminders);
+
+    // 🔹 Xóa trên Firebase
+    final firebaseService = FirebaseReminderService();
+    await firebaseService.deleteReminder(id);
   }
 
   /// Xoá nhiều reminders
@@ -98,6 +111,12 @@ class ReminderStorage {
     final reminders = await loadReminders();
     reminders.removeWhere((r) => ids.contains(r.id));
     await _saveReminders(reminders);
+
+    // 🔹 Xóa nhiều trên Firebase
+    final firebaseService = FirebaseReminderService();
+    for (var id in ids) {
+      await firebaseService.deleteReminder(id);
+    }
   }
 
   /// Lưu danh sách reminders xuống SharedPreferences
