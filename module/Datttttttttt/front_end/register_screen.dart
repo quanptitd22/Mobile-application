@@ -1,24 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class MediReminderApp extends StatelessWidget {
-  const MediReminderApp({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MediReminder',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Arial',
-      ),
-      home: const RegisterScreen(),
-    );
-  }
+  _RegisterScreenState createState() => _RegisterScreenState();
 }
 
-class RegisterScreen extends StatelessWidget {
-  const RegisterScreen({super.key});
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _loading = false;
+
+  Future<void> _register() async {
+    setState(() => _loading = true);
+    try {
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("🎉 Đăng ký thành công!")),
+      );
+      _emailController.clear();
+      _passwordController.clear();
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("⚠️ Lỗi: ${e.message}")),
+      );
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,19 +45,13 @@ class RegisterScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Hình minh họa
               SizedBox(
                 height: 120,
-                child: Image.asset(
-                  "assets/images/calendar_pill.jpg", // 👉 thay ảnh của bạn
-                  fit: BoxFit.contain,
-                ),
+                child: Image.asset("assets/images/calendar_pill.jpg"),
               ),
               const SizedBox(height: 20),
-
-              // Tiêu đề
               const Text(
-                "Medicine Reminder ",
+                "Medicine Reminder",
                 style: TextStyle(
                   fontFamily: 'Montserrat',
                   fontSize: 30,
@@ -51,30 +60,21 @@ class RegisterScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-
-              // Subtitle
               const Text(
                 "Join us to manage your meds",
-                style: TextStyle(
-                  fontSize: 20,
-                  color: Colors.black,
-                ),
+                style: TextStyle(fontSize: 20, color: Colors.black),
               ),
               const SizedBox(height: 30),
 
-              // Email field
+              // Email
               Align(
                 alignment: Alignment.centerLeft,
-                child: const Text(
-                  "Email *",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
+                child: const Text("Email *",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ),
               const SizedBox(height: 6),
               TextField(
+                controller: _emailController,
                 decoration: InputDecoration(
                   hintText: "user@example.com",
                   prefixIcon: const Icon(Icons.email_outlined),
@@ -87,19 +87,15 @@ class RegisterScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // Password field
+              // Password
               Align(
                 alignment: Alignment.centerLeft,
-                child: const Text(
-                  "Password *",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
+                child: const Text("Password *",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ),
               const SizedBox(height: 6),
               TextField(
+                controller: _passwordController,
                 obscureText: true,
                 decoration: InputDecoration(
                   hintText: "**********",
@@ -113,7 +109,7 @@ class RegisterScreen extends StatelessWidget {
               ),
               const SizedBox(height: 30),
 
-              // Nút Register
+              // Register button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -124,36 +120,34 @@ class RegisterScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  onPressed: () {
-                    // 👉 Thêm logic register ở đây
-                  },
-                  child: const Text(
+                  onPressed: _loading ? null : _register,
+                  child: _loading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
                     "Register",
-                    style: TextStyle(fontSize: 25, color: Colors.black),
+                    style: TextStyle(
+                        fontSize: 25,
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
-
               const SizedBox(height: 20),
 
-              // Đã có tài khoản? Log in
+              // Log in link
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    "Already a member? ",
-                    style: TextStyle(color: Colors.black, fontSize: 20),
-                  ),
+                  const Text("Already a member? ",
+                      style: TextStyle(color: Colors.black, fontSize: 20)),
                   GestureDetector(
                     onTap: () {
-                      // 👉 điều hướng sang màn Login
+                      // TODO: Navigate to login page
                     },
                     child: const Text(
                       "Log in",
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: Colors.black,
-                      ),
+                      style:
+                      TextStyle(fontSize: 20, color: Colors.blueAccent),
                     ),
                   ),
                 ],
@@ -165,4 +159,3 @@ class RegisterScreen extends StatelessWidget {
     );
   }
 }
-

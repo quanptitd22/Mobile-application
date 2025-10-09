@@ -94,4 +94,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'iotmedicalbox.firebasestorage.app',
     measurementId: 'G-DKC60Q2N41',
   );
+
 }

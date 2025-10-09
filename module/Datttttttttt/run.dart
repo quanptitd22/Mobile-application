@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
-import 'front_end/welcome_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:mobile_application/firebase_options.dart';
+import 'front_end/register_screen.dart';
 
-
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MediReminderApp());
 }
 
@@ -11,11 +16,9 @@ class MediReminderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Nhắc nhở uống thuốc',
+    return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: const WelcomeScreen(), // mở đầu bằng Welcome
+      home: RegisterScreen(),
     );
   }
 }
