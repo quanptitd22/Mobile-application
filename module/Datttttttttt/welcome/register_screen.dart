@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'login_page.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -24,8 +25,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("🎉 Đăng ký thành công!")),
       );
-      _emailController.clear();
-      _passwordController.clear();
+
+      // ✅ Chuyển sang LoginPage sau khi đăng ký thành công
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+      );
+
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("⚠️ Lỗi: ${e.message}")),
@@ -34,6 +40,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() => _loading = false);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +149,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: TextStyle(color: Colors.black, fontSize: 20)),
                   GestureDetector(
                     onTap: () {
-                      // TODO: Navigate to login page
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                      );
                     },
                     child: const Text(
                       "Log in",

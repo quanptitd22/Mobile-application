@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:mobile_application/firebase_options.dart';
-import 'front_end/register_screen.dart';
+import 'package:medireminder_app/firebase_options.dart';
+import 'welcome/register_screen.dart';
+import 'welcome/welcome_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,9 +17,14 @@ class MediReminderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: RegisterScreen(),
+      title: 'MediReminder',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        fontFamily: 'Montserrat',
+      ),
+      home: const WelcomeScreen(), // 👉 mở đầu bằng Welcome
     );
   }
 }
