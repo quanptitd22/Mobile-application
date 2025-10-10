@@ -24,7 +24,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
   int _intervalDays = 2;   // cho "cách ngày"
   int _durationDays = 7;   // cho "theo số ngày"
 
-  final List<String> _units = ['viên', 'ml', 'lọ', 'gói'];
+  final List<String> _units = ['viên', 'ml', 'lọ', 'gói', 'liều'];
 
   @override
   void initState() {
@@ -104,16 +104,46 @@ class _ReminderScreenState extends State<ReminderScreen> {
       return;
     }
 
+    // 🔹 Chuyển danh sách _times thành danh sách chuỗi "HH:mm"
+    final timesPerDay = _times
+        .map((t) =>
+    '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}')
+        .toList();
+
+    // 🔹 Tính intervalDays & endDate theo loại tần suất
+    int interval = 1;
+    DateTime? endDate;
+
+    switch (_selectedFrequency) {
+      case 'Hằng ngày':
+        interval = 1;
+        endDate = DateTime.now().add(Duration(days: _durationDays));
+        break;
+      case 'Cách ngày':
+        interval = _intervalDays;
+        endDate = DateTime.now().add(Duration(days: _durationDays));
+        break;
+      case 'Theo số ngày':
+        interval = 1;
+        endDate = DateTime.now().add(Duration(days: _durationDays));
+        break;
+      case 'Một lần':
+        interval = 9999; // coi như chỉ một lần duy nhất
+        endDate = DateTime.now();
+        break;
+    }
+
     final reminder = Reminder(
       id: widget.existingReminder?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
-      dosage: _selectedQuantity, // số lượng uống
-      time: _times.first,        // lấy mốc giờ đầu tiên
+      dosage: _selectedQuantity,
+      time: _times.first,
       frequency: _selectedFrequency,
-      intervalDays: _intervalDays,
-      endDate: DateTime.now().add(Duration(days: _durationDays)),
+      intervalDays: interval,
+      endDate: endDate,
+      timesPerDay: timesPerDay,
     );
 
     Navigator.pop(context, reminder);
