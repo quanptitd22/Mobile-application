@@ -1,57 +1,62 @@
-import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/reminder_storage.dart';
 
 class FirebaseReminderService {
-  final DatabaseReference _db = FirebaseDatabase.instance.ref('reminders');
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
 
-  /// Thêm reminder mới lên Firebase
+  /// Trả về collection tương ứng với user hiện tại
+  CollectionReference<Map<String, dynamic>> get _reminderCollection {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception("Người dùng chưa đăng nhập");
+    }
+    return _firestore.collection('users').doc(user.uid).collection('reminders');
+  }
+
+  /// Thêm reminder mới
   Future<void> addReminder(Reminder reminder) async {
     try {
-      await _db.child(reminder.id).set(reminder.toJson());
-      print("Đã thêm thuốc lên Firebase: ${reminder.title}");
+      await _reminderCollection.doc(reminder.id).set(reminder.toJson());
+      print("✅ Đã thêm thuốc: ${reminder.title}");
     } catch (e) {
-      print("Lỗi khi thêm reminder lên Firebase: $e");
+      print("❌ Lỗi khi thêm reminder: $e");
     }
   }
 
   /// Cập nhật reminder
   Future<void> updateReminder(Reminder reminder) async {
     try {
-      await _db.child(reminder.id).update(reminder.toJson());
-      print("Đã cập nhật thuốc trên Firebase: ${reminder.title}");
+      await _reminderCollection.doc(reminder.id).update(reminder.toJson());
+      print("✅ Đã cập nhật thuốc: ${reminder.title}");
     } catch (e) {
-      print("Lỗi khi cập nhật reminder: $e");
+      print("❌ Lỗi khi cập nhật reminder: $e");
     }
   }
 
-  /// Xoá reminder
+  /// 🔴 Xoá reminder
   Future<void> deleteReminder(String id) async {
     try {
-      await _db.child(id).remove();
-      print("Đã xoá thuốc có id: $id");
+      await _reminderCollection.doc(id).delete();
+      print("🗑️ Đã xoá thuốc có id: $id");
     } catch (e) {
-      print("Lỗi khi xoá reminder: $e");
+      print("❌ Lỗi khi xoá reminder: $e");
     }
   }
 
-  /// Lấy toàn bộ reminders từ Firebase
+  /// 📦 Lấy toàn bộ reminders của user hiện tại
   Future<List<Reminder>> getAllReminders() async {
     try {
-      final snapshot = await _db.get();
-      if (snapshot.exists) {
-        final data = Map<String, dynamic>.from(snapshot.value as Map);
-        final reminders = data.values
-            .map((e) => Reminder.fromJson(Map<String, dynamic>.from(e)))
-            .toList();
+      final snapshot = await _reminderCollection.get();
+      final reminders = snapshot.docs
+          .map((doc) => Reminder.fromJson(doc.data()))
+          .toList();
 
-        print("Đã tải ${reminders.length} thuốc từ Firebase");
-        return reminders;
-      } else {
-        print("Firebase trống, chưa có thuốc nào");
-        return [];
-      }
+      print("📥 Đã tải ${reminders.length} thuốc từ Firestore");
+      return reminders;
     } catch (e) {
-      print("Lỗi khi tải dữ liệu từ Firebase: $e");
+      print("❌ Lỗi khi tải reminders: $e");
       return [];
     }
   }

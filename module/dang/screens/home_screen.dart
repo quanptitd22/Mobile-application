@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../widgets/manage_card.dart';
 import '../widgets/prescription_card.dart';
 import '../widgets/reminder_tile.dart';
 import 'reminder_screen.dart';
 import 'history_screen.dart';
-import '../models/reminder_storage.dart';
+import '../models/reminder_storage.dart'; 
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,6 +17,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   List<Reminder> reminders = [];
 
   @override
@@ -23,10 +29,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadReminders() async {
-    final data = await ReminderStorage.loadReminders();
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('reminders')
+        .get();
+
     setState(() {
-      reminders = data;
+      reminders = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+
+        return Reminder(
+          id: doc.id,
+          title: data['title'] ?? '',
+          description: data['description'] ?? '',
+          dosage: data['dosage'] != null
+              ? int.tryParse(data['dosage'].toString()) ?? 0
+              : 0,
+          time: data['time'] != null
+              ? DateTime.parse(data['time'])
+              : DateTime.now(),
+          frequency: data['frequency'] ?? "Hằng ngày",
+          intervalDays: data['intervalDays'] ?? 1,
+          endDate: data['endDate'] != null
+              ? DateTime.tryParse(data['endDate'])
+              : null,
+        );
+      }).toList();
     });
+
+
   }
 
   Future<void> _addReminder() async {
@@ -36,14 +71,35 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (result != null && result is Reminder) {
-      // 👉 Lưu reminder (dùng ReminderStorage luôn)
-      await ReminderStorage.saveReminder(result);
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      // 🔥 Lưu vào Firestore
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('reminders')
+          .add({
+        'title': result.title,
+        'time': result.time.toIso8601String(),
+      });
+
       await _loadReminders();
     }
   }
 
   Future<void> _deleteReminder(Reminder reminder) async {
-    await ReminderStorage.deleteReminder(reminder.id);
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    // 🔥 Xóa trên Firestore
+    await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('reminders')
+        .doc(reminder.id)
+        .delete();
+
     await _loadReminders();
 
     if (mounted) {
@@ -69,11 +125,13 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: const Icon(Icons.menu, color: Colors.black),
           onPressed: () {},
         ),
-        actions: const [
+        actions: [
           CircleAvatar(
-            backgroundImage: NetworkImage("https://i.pravatar.cc/150?img=5"),
+            backgroundImage: NetworkImage(
+              _auth.currentUser?.photoURL ?? "https://i.pravatar.cc/150?img=5",
+            ),
           ),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
         ],
       ),
       body: SingleChildScrollView(
@@ -144,15 +202,7 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
               children: [
-                // Scheduled
-                GestureDetector(
-                  onTap: () {
-                    // 👉 Có thể mở màn hình quản lý Scheduled
-                  },
-                  child: const ManageCard(Icons.schedule, "Scheduled"),
-                ),
-
-                // History
+                const ManageCard(Icons.schedule, "Scheduled"),
                 GestureDetector(
                   onTap: () {
                     Navigator.push(
@@ -163,15 +213,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                   child: const ManageCard(Icons.history, "History"),
                 ),
-
                 const ManageCard(Icons.info, "Medication"),
-
-                // 👉 Nhấn vào đây để mở màn hình setup
                 GestureDetector(
                   onTap: _addReminder,
                   child: const ManageCard(Icons.notifications, "Set"),
                 ),
-
                 const ManageCard(Icons.check_circle, "Track"),
                 const ManageCard(Icons.favorite, "Health status"),
               ],

@@ -1,29 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:medireminder_app/firebase_options.dart';
+import 'welcome/login_screen.dart';
+import 'welcome/register_screen.dart';
+import '../dang/screens/home_screen.dart'; // màn hình chính sau khi đăng nhập
 import 'welcome/welcome_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  runApp(const MediReminderApp());
+  await Firebase.initializeApp(); // quan trọng
+  runApp(const MyApp());
 }
 
-class MediReminderApp extends StatelessWidget {
-  const MediReminderApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'MediReminder',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Montserrat',
-      ),
-      home: const WelcomeScreen(), // 👉 mở đầu bằng Welcome
+      title: 'Medication Reminder',
+      initialRoute: '/welcome',
+      routes: {
+        '/welcome': (context) => const WelcomeScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
+        '/home': (context) => const HomeScreen(),
+      },
     );
   }
 }
