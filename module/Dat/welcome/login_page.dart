@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../dang/screens/home_screen.dart'; // 👈 Đường dẫn đến home_screen.dart
-import 'register_screen.dart'; // Nếu bạn có file này để quay lại đăng ký
+import '../../dang/screens/home_screen.dart'; //
+import 'register_screen.dart'; //
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -84,7 +84,7 @@ class _LoginPageState extends State<LoginPage> {
               TextField(
                 controller: _emailController,
                 decoration: InputDecoration(
-                  hintText: "user@example.com",
+                  hintText: "Email",
                   prefixIcon: const Icon(Icons.email_outlined),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -106,7 +106,7 @@ class _LoginPageState extends State<LoginPage> {
                 controller: _passwordController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  hintText: "**********",
+                  hintText: "Password",
                   prefixIcon: const Icon(Icons.lock_outline),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),

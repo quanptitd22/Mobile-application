@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:medireminder_app/firebase_options.dart';
-import 'welcome/register_screen.dart';
 import 'welcome/welcome_screen.dart';
 
 void main() async {

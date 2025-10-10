@@ -83,7 +83,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               TextField(
                 controller: _emailController,
                 decoration: InputDecoration(
-                  hintText: "user@example.com",
+                  hintText: "Email",
                   prefixIcon: const Icon(Icons.email_outlined),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -97,7 +97,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               // Password
               Align(
                 alignment: Alignment.centerLeft,
-                child: const Text("Password *",
+                child: const Text("Password",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ),
               const SizedBox(height: 6),
@@ -105,7 +105,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _passwordController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  hintText: "**********",
+                  hintText: "Password",
                   prefixIcon: const Icon(Icons.lock_outline),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
