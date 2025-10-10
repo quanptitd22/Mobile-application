@@ -37,6 +37,7 @@ flutter:
     - assets/images/medicine.png
     - assets/images/calendar_pill.jpg
     - assets/images/hinh1.png
+    - assets/images/anhuongthuoc.jpg
 
   fonts:
     - family: Montserrat

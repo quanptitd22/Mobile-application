@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'login_page.dart';
+
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
@@ -16,7 +18,7 @@ class LoginScreen extends StatelessWidget {
               // Ảnh minh họa
               SizedBox(
                 height: 300,
-                child: Image.asset("assets/images/login.png"),
+                child: Image.asset("assets/images/anhuongthuoc.jpg"),
               ),
 
               const Text(
@@ -47,7 +49,7 @@ class LoginScreen extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
+                            builder: (context) => const LoginPage(),
                           ),
                         );
                       },

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'login_screen.dart';
 import 'register_screen.dart'; // import để điều hướng
 
 class WelcomeScreen extends StatelessWidget {
@@ -52,7 +53,7 @@ class WelcomeScreen extends StatelessWidget {
                         );
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                          MaterialPageRoute(builder: (context) => const LoginScreen()),
                         );
                       },
                       child: const Text(
