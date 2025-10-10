@@ -104,7 +104,7 @@ class _MedicationReminderScreenState extends State<MedicationReminderScreen> {
                 Expanded(
                   flex: 3,
                   child: DropdownButtonFormField(
-                    value: unit,
+                    initialValue: unit,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                     ),
@@ -166,7 +166,7 @@ class _MedicationReminderScreenState extends State<MedicationReminderScreen> {
                 Expanded(
                   flex: 3,
                   child: DropdownButtonFormField(
-                    value: durationUnit,
+                    initialValue: durationUnit,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                     ),

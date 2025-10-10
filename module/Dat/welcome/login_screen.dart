@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'register_screen.dart'; // import để điều hướng
 
-class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key});
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,17 +13,17 @@ class WelcomeScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // ảnh
+              // Ảnh minh họa
               SizedBox(
                 height: 300,
-                child: Image.asset("assets/images/medicine.png"),
+                child: Image.asset("assets/images/login.png"),
               ),
 
               const Text(
-                "Nhắc nhở uống thuốc",
+                "Chào mừng trở lại!",
                 style: TextStyle(
                   fontFamily: 'Montserrat',
-                  fontSize: 40,
+                  fontSize: 35,
                   fontWeight: FontWeight.bold,
                   color: Colors.black,
                 ),
@@ -33,7 +32,7 @@ class WelcomeScreen extends StatelessWidget {
 
               Column(
                 children: [
-                  // Nút Get Started
+                  // Nút Log in
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -48,15 +47,17 @@ class WelcomeScreen extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => const RegisterScreen()),
+                            builder: (context) => const LoginScreen(),
+                          ),
                         );
                       },
                       child: const Text(
-                        "Bắt đầu",
+                        "Đăng nhập",
                         style: TextStyle(
-                            fontSize: 25,
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold),
+                          fontSize: 25,
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
