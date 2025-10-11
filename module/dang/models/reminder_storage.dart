@@ -222,4 +222,11 @@ class ReminderStorage {
     reminders.removeWhere((r) => r.title == title);
     await _saveReminders(reminders);
   }
+
+  static Future<void> saveAllReminders(List<Reminder> reminders) async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonString = json.encode(reminders.map((r) => r.toJson()).toList());
+    await prefs.setString(_key, jsonString);
+  }
+
 }

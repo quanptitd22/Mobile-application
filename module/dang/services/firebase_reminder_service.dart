@@ -2,20 +2,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/reminder_storage.dart';
 
+/// 🔹 Lớp quản lý đọc/ghi dữ liệu Reminder lên Firestore theo từng user
 class FirebaseReminderService {
-  final _auth = FirebaseAuth.instance;
-  final _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Trả về collection tương ứng với user hiện tại
+  /// 🔸 Collection reminders của user hiện tại
   CollectionReference<Map<String, dynamic>> get _reminderCollection {
     final user = _auth.currentUser;
-    if (user == null) {
-      throw Exception("Người dùng chưa đăng nhập");
-    }
+    if (user == null) throw Exception("⚠️ Người dùng chưa đăng nhập");
     return _firestore.collection('users').doc(user.uid).collection('reminders');
   }
 
-  /// Thêm reminder mới
+  /// ✅ Thêm thuốc mới lên Firestore
   Future<void> addReminder(Reminder reminder) async {
     try {
       await _reminderCollection.doc(reminder.id).set(reminder.toJson());
@@ -25,17 +24,17 @@ class FirebaseReminderService {
     }
   }
 
-  /// Cập nhật reminder
+  /// 🟡 Cập nhật thuốc đã có
   Future<void> updateReminder(Reminder reminder) async {
     try {
       await _reminderCollection.doc(reminder.id).update(reminder.toJson());
-      print("✅ Đã cập nhật thuốc: ${reminder.title}");
+      print("🟡 Đã cập nhật thuốc: ${reminder.title}");
     } catch (e) {
       print("❌ Lỗi khi cập nhật reminder: $e");
     }
   }
 
-  /// 🔴 Xoá reminder
+  /// 🗑️ Xoá thuốc
   Future<void> deleteReminder(String id) async {
     try {
       await _reminderCollection.doc(id).delete();
@@ -45,7 +44,7 @@ class FirebaseReminderService {
     }
   }
 
-  /// 📦 Lấy toàn bộ reminders của user hiện tại
+  /// 📥 Lấy toàn bộ reminders của user hiện tại
   Future<List<Reminder>> getAllReminders() async {
     try {
       final snapshot = await _reminderCollection.get();
@@ -58,6 +57,17 @@ class FirebaseReminderService {
     } catch (e) {
       print("❌ Lỗi khi tải reminders: $e");
       return [];
+    }
+  }
+
+  /// 🔄 Đồng bộ dữ liệu Firestore ↔ SharedPreferences
+  Future<void> syncFromFirebaseToLocal() async {
+    try {
+      final reminders = await getAllReminders();
+      await ReminderStorage.saveAllReminders(reminders);
+      print("🔁 Đã đồng bộ dữ liệu từ Firebase xuống local");
+    } catch (e) {
+      print("❌ Lỗi khi đồng bộ dữ liệu: $e");
     }
   }
 }
