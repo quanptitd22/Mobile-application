@@ -15,6 +15,7 @@ void main() async {
 
   // ✅ Tạo instance của service
   final firebaseService = FirebaseReminderService();
+  await firebaseService.syncFromFirebaseToLocal(); // 🔁 Đồng bộ khi mở app
 
   try {
     // ✅ Đồng bộ dữ liệu từ Firestore xuống local
