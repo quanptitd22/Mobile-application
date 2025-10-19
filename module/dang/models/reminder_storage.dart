@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/firebase_reminder_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// 🔹 Model đại diện cho một thuốc cần nhắc
 class Reminder {
@@ -45,6 +45,12 @@ class Reminder {
 
   /// 🔹 Parse từ JSON ra object
   factory Reminder.fromJson(Map<String, dynamic> json) {
+    // Hàm phụ để chuyển DateTime -> "HH:mm"
+    String _formatTime(DateTime time) {
+      final hour = time.hour.toString().padLeft(2, '0');
+      final minute = time.minute.toString().padLeft(2, '0');
+      return '$hour:$minute';
+    }
     return Reminder(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? 'Không tên',
@@ -52,9 +58,11 @@ class Reminder {
       dosage: (json['dosage'] is int)
           ? json['dosage']
           : int.tryParse(json['dosage']?.toString() ?? '1') ?? 1,
-      time: json['time'] != null && json['time'].toString().isNotEmpty
+      time: json['time'] is Timestamp
+          ? (json['time'] as Timestamp).toDate()
+          : (json['time'] != null && json['time'].toString().isNotEmpty
           ? DateTime.tryParse(json['time'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+          : DateTime.now()),
       frequency: json['frequency']?.toString() ?? "Hằng ngày",
       intervalDays: (json['intervalDays'] is int)
           ? json['intervalDays']
@@ -66,7 +74,13 @@ class Reminder {
           json['timesPerDay'] is List &&
           (json['timesPerDay'] as List).isNotEmpty)
           ? List<String>.from(json['timesPerDay'])
-          : ["08:00"],
+          : [
+        if (json['time'] != null &&
+            DateTime.tryParse(json['time'].toString()) != null)
+          _formatTime(DateTime.parse(json['time'].toString()))
+        else
+          "08:00"
+      ],
     );
   }
 
