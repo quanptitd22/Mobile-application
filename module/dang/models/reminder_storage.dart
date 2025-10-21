@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// 🔹 Model đại diện cho một thuốc cần nhắc
 class Reminder {
   String id;
+  final int? drawer;
   String title;
   String description;
   int dosage; // số lượng thuốc
@@ -25,7 +26,8 @@ class Reminder {
     this.frequency = "Hằng ngày",
     this.intervalDays = 1,
     this.endDate,
-    this.timesPerDay = const ["08:00"], // mặc định 1 lần/ngày
+    this.timesPerDay = const ["08:00"], // mặc định 1 lần/ngày\
+    this.drawer,
   });
 
   /// 🔹 Chuyển sang JSON để lưu
@@ -40,6 +42,7 @@ class Reminder {
       'intervalDays': intervalDays,
       'endDate': endDate?.toIso8601String(),
       'timesPerDay': timesPerDay,
+      'drawer': drawer,
     };
   }
 
@@ -52,6 +55,7 @@ class Reminder {
       return '$hour:$minute';
     }
     return Reminder(
+      drawer: json['drawer'] is int ? json['drawer'] : 1,
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? 'Không tên',
       description: json['description']?.toString() ?? '',
@@ -196,6 +200,9 @@ class ReminderStorage {
           'description': reminder.description,
           'dosage': reminder.dosage,
           'time': time,
+          'drawer': reminder.drawer,
+
+          'reminderId': reminder.id, // <-- Dòng này đã có, rất tốt!
         });
       }
     }
@@ -204,6 +211,22 @@ class ReminderStorage {
     schedules.sort((a, b) => (a['time'] as DateTime).compareTo(b['time'] as DateTime));
     return schedules;
   }
+
+  // ================== BẮT ĐẦU CODE MỚI ==================
+  /// 🔸 Lấy một Reminder cụ thể bằng ID (Dùng cho tính năng Chỉnh sửa)
+  static Future<Reminder?> getReminderById(String id) async {
+    final reminders = await loadReminders();
+    try {
+      // Dùng firstWhere để tìm
+      return reminders.firstWhere((r) => r.id == id);
+    } catch (e) {
+      // firstWhere ném lỗi nếu không tìm thấy
+      print("ℹ️ Không tìm thấy reminder với ID: $id");
+      return null;
+    }
+  }
+  // ================== KẾT THÚC CODE MỚI ==================
+
 
   // 🟡 THÊM MỚI: Xoá một lần thuốc cụ thể
   static Future<void> deleteScheduleOnce(Map<String, dynamic> schedule) async {
