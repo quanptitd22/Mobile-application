@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../widgets/manage_card.dart';
-import '../widgets/prescription_card.dart';
-import '../widgets/reminder_tile.dart';
 import 'reminder_screen.dart';
 import 'history_screen.dart';
 import '../models/reminder_storage.dart';
@@ -41,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       reminders = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
 
         return Reminder(
           id: doc.id,

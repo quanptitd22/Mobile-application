@@ -5,7 +5,6 @@ import 'welcome/register_screen.dart';
 import '../dang/screens/home_screen.dart'; // màn hình chính sau khi đăng nhập
 import 'welcome/welcome_screen.dart';
 import '../dang/services/firebase_reminder_service.dart';
-import '../dang/models/reminder_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
