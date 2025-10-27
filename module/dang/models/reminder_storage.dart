@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/firebase_reminder_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 /// 🔹 Model đại diện cho một thuốc cần nhắc
 class Reminder {
@@ -139,6 +140,13 @@ class ReminderStorage {
     reminders.add(reminder);
     await _saveReminders(reminders);
 
+    // 🔒 Chỉ đồng bộ nếu đã đăng nhập
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print("⚠️ Không thể đồng bộ Firebase vì chưa đăng nhập");
+      return;
+    }
+
     // Đồng bộ Firebase
     final firebaseService = FirebaseReminderService();
     await firebaseService.addReminder(reminder);
@@ -152,6 +160,12 @@ class ReminderStorage {
       reminders[index] = updatedReminder;
       await _saveReminders(reminders);
 
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print("⚠️ Không thể đồng bộ Firebase vì chưa đăng nhập");
+        return;
+      }
+
       final firebaseService = FirebaseReminderService();
       await firebaseService.updateReminder(updatedReminder);
     }
@@ -162,6 +176,12 @@ class ReminderStorage {
     final reminders = await loadReminders();
     reminders.removeWhere((r) => r.id == id);
     await _saveReminders(reminders);
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print("⚠️ Không thể đồng bộ Firebase vì chưa đăng nhập");
+      return;
+    }
 
     final firebaseService = FirebaseReminderService();
     await firebaseService.deleteReminder(id);
@@ -298,4 +318,23 @@ class ReminderStorage {
       print("❌ Lỗi khi đồng bộ từ Firebase: $e");
     }
   }
+  // Hàm này đồng bộ local → RTDB theo user để thiết bị IoT đọc được
+  static Future<void> syncLocalToRTDB() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print("⚠️ Không thể đồng bộ RTDB vì chưa đăng nhập");
+      return;
+    }
+
+    final reminders = await loadReminders();
+    final ref = FirebaseDatabase.instance.ref('users/${user.uid}/reminders');
+
+    await ref.remove(); // Xóa cũ để tránh trùng
+    for (var r in reminders) {
+      await ref.child(r.id).set(r.toJson());
+    }
+
+    print("✅ Đã đồng bộ local → RTDB cho user ${user.uid}");
+  }
+
 }

@@ -1,28 +1,34 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/reminder_storage.dart';
+import 'firebase_sync_service.dart';
+import 'package:firebase_database/firebase_database.dart';
 
-/// 🔹 Lớp quản lý đọc/ghi dữ liệu Reminder lên Firestore theo từng user
-/// Có đồng bộ 2 chiều với SharedPreferences
+/// 🔹 Lớp quản lý đọc/ghi dữ liệu Reminder theo từng user riêng biệt
+/// Mỗi user có dữ liệu riêng trong Firestore & Realtime Database
 class FirebaseReminderService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseDatabase _realtimeDB = FirebaseDatabase.instance;
 
-  /// 🔸 Collection reminders của user hiện tại
+  /// 🔐 Lấy collection reminders của user hiện tại
   CollectionReference<Map<String, dynamic>> get _reminderCollection {
     final user = _auth.currentUser;
     if (user == null) throw Exception("⚠️ Người dùng chưa đăng nhập");
     return _firestore.collection('users').doc(user.uid).collection('reminders');
   }
 
-  /// ✅ Thêm thuốc mới lên Firestore
+  /// ✅ Thêm thuốc mới
   Future<void> addReminder(Reminder reminder) async {
     try {
       await _reminderCollection.doc(reminder.id).set(reminder.toJson());
-      print("✅ Đã thêm thuốc: ${reminder.title}");
 
-      // Đồng bộ local sau khi thêm
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // 🔐 Đồng bộ riêng theo uid
       await syncFromFirebaseToLocal();
+      await syncFromFirebaseToRTDB();
+      print("✅ Đã thêm thuốc: ${reminder.title}");
     } catch (e) {
       print("❌ Lỗi khi thêm reminder: $e");
     }
@@ -32,9 +38,12 @@ class FirebaseReminderService {
   Future<void> updateReminder(Reminder reminder) async {
     try {
       await _reminderCollection.doc(reminder.id).update(reminder.toJson());
-      print("🟡 Đã cập nhật thuốc: ${reminder.title}");
+
+      await Future.delayed(const Duration(milliseconds: 300));
 
       await syncFromFirebaseToLocal();
+      await syncFromFirebaseToRTDB();
+      print("🟡 Đã cập nhật thuốc: ${reminder.title}");
     } catch (e) {
       print("❌ Lỗi khi cập nhật reminder: $e");
     }
@@ -44,9 +53,12 @@ class FirebaseReminderService {
   Future<void> deleteReminder(String id) async {
     try {
       await _reminderCollection.doc(id).delete();
-      print("🗑️ Đã xoá thuốc có id: $id");
+
+      await Future.delayed(const Duration(milliseconds: 300));
 
       await syncFromFirebaseToLocal();
+      await syncFromFirebaseToRTDB();
+      print("🗑️ Đã xoá thuốc có id: $id");
     } catch (e) {
       print("❌ Lỗi khi xoá reminder: $e");
     }
@@ -60,7 +72,7 @@ class FirebaseReminderService {
           .map((doc) => Reminder.fromJson(doc.data()))
           .toList();
 
-      print("📥 Đã tải ${reminders.length} thuốc từ Firestore");
+      print("📥 Đã tải ${reminders.length} thuốc từ Firestore (theo user)");
       return reminders;
     } catch (e) {
       print("❌ Lỗi khi tải reminders: $e");
@@ -68,70 +80,104 @@ class FirebaseReminderService {
     }
   }
 
-  /// 🔄 Đồng bộ dữ liệu Firestore → SharedPreferences (local)
+  /// 🔄 Đồng bộ Firestore → SharedPreferences (local)
   Future<void> syncFromFirebaseToLocal() async {
     try {
       final reminders = await getAllReminders();
       await ReminderStorage.saveAllReminders(reminders);
-      print("🔁 Đã đồng bộ dữ liệu từ Firebase xuống local");
+      print("🔁 Đã đồng bộ dữ liệu từ Firebase xuống local (user hiện tại)");
     } catch (e) {
       print("❌ Lỗi khi đồng bộ dữ liệu: $e");
     }
   }
 
-  /// 👀 Theo dõi thay đổi realtime từ Firestore
-  /// Dữ liệu sẽ tự đồng bộ về local khi Firestore thay đổi
+  /// 👀 Theo dõi thay đổi realtime trong Firestore theo user
   void listenToRealtimeUpdates() {
     try {
       _reminderCollection.snapshots().listen((snapshot) async {
         final reminders = snapshot.docs
             .map((doc) => Reminder.fromJson(doc.data()))
             .toList();
+
         await ReminderStorage.saveAllReminders(reminders);
-        print("🔔 Firestore cập nhật, đã đồng bộ realtime với local");
+        await FirebaseSyncService().syncRemindersToRealtime();
+        await syncFromFirebaseToRTDB();
+        print("🔔 Firestore cập nhật (user hiện tại), đã đồng bộ realtime");
       });
     } catch (e) {
       print("❌ Lỗi khi theo dõi realtime: $e");
     }
   }
 
-  /// 🚀 Gọi khi user đăng nhập thành công
+  /// 🚀 Khởi tạo khi user đăng nhập
   Future<void> initSyncForUser() async {
-    await syncFromFirebaseToLocal(); // tải dữ liệu hiện có
-    listenToRealtimeUpdates(); // bật theo dõi realtime
+    await syncFromFirebaseToLocal();
+    listenToRealtimeUpdates();
   }
+
+  /// 🟢 Cập nhật trạng thái thuốc
   Future<void> updateReminderStatus(String id, String status) async {
     try {
       await _reminderCollection.doc(id).update({'status': status});
-      print("✅ Đã cập nhật trạng thái của thuốc $id -> $status");
+      await syncFromFirebaseToRTDB();
+      print("✅ Cập nhật trạng thái thuốc $id -> $status (user hiện tại)");
     } catch (e) {
       print("❌ Lỗi khi cập nhật trạng thái: $e");
     }
   }
-  /// 🗑️ Xóa toàn bộ reminders có cùng tiêu đề (title)
+
+  /// 🗑️ Xóa toàn bộ reminders có cùng tiêu đề
   Future<void> deleteAllRemindersByTitle(String title) async {
     try {
-      // 🔹 Lấy toàn bộ reminder có title trùng
-      final snapshot = await _reminderCollection.where('title', isEqualTo: title).get();
+      final snapshot =
+      await _reminderCollection.where('title', isEqualTo: title).get();
 
-      if (snapshot.docs.isEmpty) {
-        print("⚠️ Không tìm thấy thuốc nào có title: $title");
-        return;
-      }
-
-      // 🔹 Xóa từng reminder
       for (var doc in snapshot.docs) {
         await doc.reference.delete();
         print("🗑️ Đã xoá thuốc có id: ${doc.id}");
       }
 
-      // 🔹 Sau khi xóa xong, đồng bộ lại dữ liệu local
       final reminders = await getAllReminders();
       await ReminderStorage.saveAllReminders(reminders);
+      await FirebaseSyncService().syncRemindersToRealtime();
+      await syncFromFirebaseToRTDB();
 
-      print("✅ Đã xóa toàn bộ thuốc có title: $title");
+      print("✅ Đã xoá toàn bộ thuốc có title: $title (user hiện tại)");
     } catch (e) {
-      print("❌ Lỗi khi xoá toàn bộ thuốc có title '$title': $e");
+      print("❌ Lỗi khi xoá thuốc có title '$title': $e");
+    }
+  }
+
+  /// 🔁 Đồng bộ dữ liệu Firestore → Realtime Database riêng từng user
+  Future<void> syncFromFirebaseToRTDB() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception("⚠️ Người dùng chưa đăng nhập");
+
+      final snapshot = await _reminderCollection.get();
+
+      // 🔐 Ghi dữ liệu vào nhánh riêng của user
+      final userRef = _realtimeDB.ref('users/${user.uid}/reminders');
+      await userRef.remove(); // Xóa dữ liệu cũ để tránh trùng lặp
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        await userRef.child(doc.id).set({
+          'id': doc.id,
+          'title': data['title'] ?? '',
+          'description': data['description'] ?? '',
+          'dosage': data['dosage'] ?? 1,
+          'time': data['time'] ?? '',
+          'frequency': data['frequency'] ?? 'Hằng ngày',
+          'intervalDays': data['intervalDays'] ?? 1,
+          'endDate': data['endDate'] ?? '',
+          'timesPerDay': data['timesPerDay'] ?? ['08:00'],
+        });
+      }
+
+      print('✅ Đồng bộ Firestore → RTDB thành công cho user ${user.uid}');
+    } catch (e) {
+      print('❌ Lỗi khi đồng bộ Firestore sang RTDB: $e');
     }
   }
 }

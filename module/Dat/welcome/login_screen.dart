@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../dang/services/firebase_reminder_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -25,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
+      await _auth.setLanguageCode('vi');
       // 1️⃣ Đăng nhập Firebase Auth
       UserCredential userCredential =
       await _auth.signInWithEmailAndPassword(
@@ -44,7 +46,15 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
 
-      // 3️⃣ Chuyển sang trang chính
+      // ✅ 3️⃣ Sau khi đăng nhập thành công, đồng bộ dữ liệu riêng cho user
+      final firebaseService = FirebaseReminderService();
+      await firebaseService.syncFromFirebaseToLocal();
+      await firebaseService.syncFromFirebaseToRTDB();
+      // ✅ Bật chế độ realtime sync sau khi đăng nhập
+      firebaseService.initSyncForUser();
+      print("✅ Đồng bộ dữ liệu user $uid thành công!");
+
+      // 4️⃣ Chuyển sang trang chính
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Đăng nhập thành công!')),

@@ -6,8 +6,7 @@ import 'package:medireminder_app/firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized(); // 👈 Cần có khi gọi async
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // 👈 Dành cho firebase_options.dart
+  await Firebase.initializeApp(// 👈 Dành cho firebase_options.dart
   );
   runApp(const MyApp());
 }
