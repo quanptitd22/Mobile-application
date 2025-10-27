@@ -7,7 +7,7 @@ import 'reminder_screen.dart'; // <-- Import màn hình chỉnh sửa
 enum ReminderStatus { pending, completed, skipped }
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({Key? key}) : super(key: key);
+  const HistoryScreen({super.key});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -113,13 +113,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
               onPrimary: Colors.white,
               onSurface: Colors.black87,
             ),
-            dialogBackgroundColor: Colors.white,
             // Style cho tiêu đề
             appBarTheme: AppBarTheme(
               backgroundColor: Colors.blue.shade600,
               foregroundColor: Colors.white,
               elevation: 0,
-            ),
+            ), dialogTheme: DialogThemeData(backgroundColor: Colors.white),
           ),
           child: child!,
         );

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../widgets/manage_card.dart';
-import '../widgets/prescription_card.dart';
-import '../widgets/reminder_tile.dart';
 import 'reminder_screen.dart';
 import 'history_screen.dart';
 import '../models/reminder_storage.dart';
@@ -41,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       reminders = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
 
         return Reminder(
           id: doc.id,
@@ -177,27 +174,27 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       // Floating Action Button
-      // floatingActionButton: Container(
-      //   decoration: BoxDecoration(
-      //     gradient: LinearGradient(
-      //       colors: [Colors.blue.shade600, Colors.purple.shade600],
-      //     ),
-      //     borderRadius: BorderRadius.circular(30),
-      //     boxShadow: [
-      //       BoxShadow(
-      //         color: Colors.blue.withOpacity(0.4),
-      //         blurRadius: 20,
-      //         offset: const Offset(0, 10),
-      //       ),
-      //     ],
-      //   ),
-      //   child: FloatingActionButton(
-      //     onPressed: _addReminder,
-      //     backgroundColor: Colors.transparent,
-      //     elevation: 0,
-      //     child: const Icon(Icons.add, size: 32),
-      //   ),
-      // ),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.blue.shade600, Colors.purple.shade600],
+          ),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withOpacity(0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          onPressed: _addReminder,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: const Icon(Icons.add, size: 32),
+        ),
+      ),
 
       // Bottom Navigation
       bottomNavigationBar: _buildBottomNav(),
@@ -304,18 +301,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       // Thêm logic cho chức năng theo dõi
                     },
                   ),
-                  // const Divider(height: 40),
-                  // _buildDrawerItem(
-                  //   icon: Icons.settings,
-                  //   title: 'Cài đặt',
-                  //   gradient: LinearGradient(
-                  //     colors: [Colors.grey.shade500, Colors.grey.shade600],
-                  //   ),
-                  //   onTap: () {
-                  //     Navigator.pop(context);
-                  //     // Thêm logic cho cài đặt
-                  //   },
-                  // ),
                   const SizedBox(height: 400),
                   _buildDrawerItem(
                     icon: Icons.logout,
@@ -441,11 +426,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 50),
 
-
           // Greeting
-
-          // Greeting
-          const Center( // <-- Thêm widget Center ở đây
+          const Center(
             child: Text(
               'Xin chào',
               style: TextStyle(
@@ -455,16 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 8),
-          // Text(
-          //   'Đừng quên uống thuốc đúng giờ nhé',
-          //   style: TextStyle(
-          //     color: Colors.blue.shade100,
-          //     fontWeight: FontWeight.bold,
-          //     fontSize:16 ,
-          //   ),
-          // ),
         ],
       ),
     );
@@ -528,7 +501,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Lịch uống thuốc hôm nay
   Widget _buildTodaySchedule() {
-    // Giới hạn chỉ hiển thị 3 lịch trình đầu tiên
     final displayedReminders = reminders.take(3).toList();
     final hasMore = reminders.length > 3;
 
@@ -580,7 +552,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Hiển thị tất cả lịch trình trong bottom sheet
   void _showAllReminders() {
     showModalBottomSheet(
       context: context,
@@ -597,7 +568,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Column(
           children: [
-            // Header
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -655,7 +625,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Danh sách lịch trình
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.all(20),
@@ -701,7 +670,40 @@ class _HomeScreenState extends State<HomeScreen> {
     return Dismissible(
       key: Key(reminder.id),
       confirmDismiss: (direction) async {
-        // Hiển thị dialog xác nhận
+        // Nếu vuốt sang phải (startToEnd) - Chỉnh sửa
+        if (direction == DismissDirection.startToEnd) {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ReminderScreen(existingReminder: reminder),
+            ),
+          );
+
+          if (result != null && result is Reminder) {
+            final user = _auth.currentUser;
+            if (user != null) {
+              await _firestore
+                  .collection('users')
+                  .doc(user.uid)
+                  .collection('reminders')
+                  .doc(reminder.id)
+                  .update({
+                'title': result.title,
+                'time': result.time.toIso8601String(),
+                'description': result.description,
+                'dosage': result.dosage,
+                'frequency': result.frequency,
+                'intervalDays': result.intervalDays,
+                'endDate': result.endDate?.toIso8601String(),
+              });
+
+              await _loadReminders();
+            }
+          }
+          return false; // Không xóa item
+        }
+
+        // Nếu vuốt sang trái (endToStart) - Xóa
         return await showDialog(
           context: context,
           builder: (BuildContext context) {
@@ -722,10 +724,24 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         );
       },
-
-
-      onDismissed: (_) => _deleteReminder(reminder),
+      onDismissed: (direction) {
+        if (direction == DismissDirection.endToStart) {
+          _deleteReminder(reminder);
+        }
+      },
       background: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.blue.shade400, Colors.purple.shade400],
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        child: const Icon(Icons.edit, color: Colors.white, size: 28),
+      ),
+      secondaryBackground: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: Colors.red,
@@ -733,37 +749,34 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        child: const Icon(Icons.delete, color: Colors.white),
+        child: const Icon(Icons.delete, color: Colors.white, size: 28),
       ),
-
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: color.withOpacity(0),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 15,
-              offset: const Offset(0, 4),
-              spreadRadius: 0,
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: color.withOpacity(0),
+              width: 1.5,
             ),
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ]
-
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 15,
+                offset: const Offset(0, 4),
+                spreadRadius: 0,
+              ),
+              BoxShadow(
+                color: color.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ]
         ),
         child: Row(
           children: [
-            // Icon thuốc
             Container(
               width: 50,
               height: 50,
@@ -779,7 +792,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 16),
 
-            // Thông tin thuốc
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -798,14 +810,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontSize: 14,
                       color: Colors.black,
                       fontWeight: FontWeight.bold,
-
                     ),
                   ),
                 ],
               ),
             ),
 
-            // Thời gian
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -833,7 +843,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Bottom Navigation
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
@@ -861,6 +870,15 @@ class _HomeScreenState extends State<HomeScreen> {
             setState(() {
               _currentIndex = index;
             });
+
+            // Xử lý chuyển màn hình khi nhấn vào tab
+            if (index == 1) {
+              // Chuyển sang HistoryScreen khi nhấn vào "Lịch uống thuốc"
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const HistoryScreen()),
+              );
+            }
           },
           selectedItemColor: Colors.blue.shade600,
           unselectedItemColor: Colors.grey.shade400,
@@ -881,17 +899,17 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               label: 'Trang chủ',
             ),
-            // BottomNavigationBarItem(
-            //   icon: Container(
-            //     padding: const EdgeInsets.all(8),
-            //     decoration: BoxDecoration(
-            //       color: _currentIndex == 1 ? Colors.blue.shade50 : Colors.transparent,
-            //       borderRadius: BorderRadius.circular(12),
-            //     ),
-            //     // child: const Icon(Icons.medication),
-            //   ),
-            //   label: '',
-            // ),
+            BottomNavigationBarItem(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _currentIndex == 1 ? Colors.blue.shade50 : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.history_edu_outlined),
+              ),
+              label: 'Lịch uống thuốc',
+            ),
             BottomNavigationBarItem(
               icon: Container(
                 padding: const EdgeInsets.all(8),

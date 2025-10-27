@@ -50,7 +50,7 @@ class Reminder {
   /// 🔹 Parse từ JSON ra object
   factory Reminder.fromJson(Map<String, dynamic> json) {
     // Hàm phụ để chuyển DateTime -> "HH:mm"
-    String _formatTime(DateTime time) {
+    String formatTime(DateTime time) {
       final hour = time.hour.toString().padLeft(2, '0');
       final minute = time.minute.toString().padLeft(2, '0');
       return '$hour:$minute';
@@ -82,7 +82,7 @@ class Reminder {
           : [
         if (json['time'] != null &&
             DateTime.tryParse(json['time'].toString()) != null)
-          _formatTime(DateTime.parse(json['time'].toString()))
+          formatTime(DateTime.parse(json['time'].toString()))
         else
           "08:00"
       ],
