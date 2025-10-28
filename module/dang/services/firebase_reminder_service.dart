@@ -68,9 +68,46 @@ class FirebaseReminderService {
   Future<List<Reminder>> getAllReminders() async {
     try {
       final snapshot = await _reminderCollection.get();
-      final reminders = snapshot.docs
-          .map((doc) => Reminder.fromJson(doc.data()))
-          .toList();
+      final reminders = snapshot.docs.map((doc) {
+        final data = doc.data();
+
+        // ép timesPerDay luôn đúng kiểu List<String>
+        List<String> parseTimes(dynamic value) {
+          if (value == null) return [];
+          if (value is List) return value.map((e) => e.toString()).toList();
+          if (value is String && value.contains(',')) {
+            return value.split(',').map((e) => e.trim()).toList();
+          }
+          if (value is String && value.isNotEmpty) {
+            return [value.trim()];
+          }
+          return [];
+        }
+
+
+        // ép kiểu đúng và truyền thủ công để tránh parse sai
+        return Reminder(
+          id: data['id']?.toString() ?? doc.id,
+          title: data['title']?.toString() ?? 'Không tên',
+          description: data['description']?.toString() ?? '',
+          dosage: (data['dosage'] is int)
+              ? data['dosage']
+              : int.tryParse(data['dosage']?.toString() ?? '1') ?? 1,
+          time: (data['time'] is Timestamp)
+              ? data['time'].toDate()
+              : DateTime.tryParse(data['time']?.toString() ?? '') ?? DateTime.now(),
+          frequency: data['frequency']?.toString() ?? "Hằng ngày",
+          intervalDays: (data['intervalDays'] is int)
+              ? data['intervalDays']
+              : int.tryParse(data['intervalDays']?.toString() ?? '1') ?? 1,
+          endDate: data['endDate'] != null && data['endDate'].toString().isNotEmpty
+              ? DateTime.tryParse(data['endDate'].toString())
+              : null,
+          timesPerDay: parseTimes(data['timesPerDay']), // ✅ phần quan trọng
+          drawer: data['drawer'] is int ? data['drawer'] : 1,
+        );
+      }).toList();
+
 
       print("📥 Đã tải ${reminders.length} thuốc từ Firestore (theo user)");
       return reminders;
@@ -171,7 +208,8 @@ class FirebaseReminderService {
           'frequency': data['frequency'] ?? 'Hằng ngày',
           'intervalDays': data['intervalDays'] ?? 1,
           'endDate': data['endDate'] ?? '',
-          'timesPerDay': data['timesPerDay'] ?? ['08:00'],
+          'timesPerDay': data['timesPerDay'] ?? ['08:00'], //
+          'drawer': data['drawer'] ?? 1, //
         });
       }
 
