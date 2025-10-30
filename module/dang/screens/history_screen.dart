@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/reminder_storage.dart'; // Đã có
-import '../services/firebase_reminder_service.dart'; // Đã có
-import 'reminder_screen.dart'; // <-- Import màn hình chỉnh sửa
+import '../models/reminder_storage.dart';
+import '../services/firebase_reminder_service.dart';
+import 'reminder_screen.dart';
 
 enum ReminderStatus { pending, completed, skipped }
 
@@ -25,9 +25,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   DateTime _weekStart = _getStartOfWeek(DateTime.now());
 
   static DateTime _getStartOfWeek(DateTime date) =>
-      date.subtract(Duration(days: date.weekday - 1)); // Monday
+      date.subtract(Duration(days: date.weekday - 1));
 
-  // --- Hằng số màu sắc cho nhất quán ---
   final Gradient _primaryGradient = LinearGradient(
     colors: [Colors.blue.shade600, Colors.purple.shade600],
     begin: Alignment.topLeft,
@@ -44,6 +43,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Future<void> _syncAndLoad() async {
     setState(() => _loading = true);
     try {
+      // ⭐ Đồng bộ từ Firestore xuống local
       await _firebaseService.syncFromFirebaseToLocal();
       await _loadLocalSchedules();
     } catch (e) {
@@ -56,7 +56,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   /// 📂 Tải dữ liệu từ local storage
   Future<void> _loadLocalSchedules() async {
     final data = await ReminderStorage.getAllSchedules();
-    // Sắp xếp đã được thực hiện bên trong ReminderStorage
     setState(() {
       _allSchedules = data;
     });
@@ -102,37 +101,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
         start: _weekStart,
         end: _weekStart.add(const Duration(days: 6)),
       ),
-      firstDate: DateTime(2020), // Có thể chọn từ năm 2020
-      lastDate: DateTime.now().add(const Duration(days: 365)), // Đến 1 năm sau
-      // Thêm builder để style cửa sổ
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: Colors.blue.shade600, // Màu chính
+              primary: Colors.blue.shade600,
               onPrimary: Colors.white,
               onSurface: Colors.black87,
             ),
-            // Style cho tiêu đề
             appBarTheme: AppBarTheme(
               backgroundColor: Colors.blue.shade600,
               foregroundColor: Colors.white,
               elevation: 0,
-            ), dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+            ),
+            dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
           ),
           child: child!,
         );
       },
     );
 
-    // Nếu người dùng chọn một khoảng
     if (pickedRange != null) {
-      final jumpDate = pickedRange.start; // Chỉ lấy ngày bắt đầu
+      final jumpDate = pickedRange.start;
       setState(() {
         _selectedDate = jumpDate;
         _weekStart = _getStartOfWeek(jumpDate);
       });
-      _filterByDate(); // Lọc lại theo ngày mới
+      _filterByDate();
     }
   }
 
@@ -174,7 +171,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   /// 🛠️ Chuyển sang màn hình Chỉnh sửa
   Future<void> _editSchedule(Map<String, dynamic> item) async {
-    // 1. Lấy ID của Reminder gốc (từ hàm getAllSchedules)
     final String? reminderId = item['reminderId'];
 
     if (reminderId == null) {
@@ -182,7 +178,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return;
     }
 
-    // 2. Lấy đối tượng Reminder đầy đủ từ Storage
     final reminder = await ReminderStorage.getReminderById(reminderId);
 
     if (reminder == null) {
@@ -190,7 +185,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return;
     }
 
-    // 3. Điều hướng đến ReminderScreen và chờ kết quả trả về
     final updatedReminder = await Navigator.push<Reminder>(
       context,
       MaterialPageRoute(
@@ -198,12 +192,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
     );
 
-    // 4. Nếu người dùng nhấn "Lưu" (updatedReminder != null)
     if (updatedReminder != null) {
-      // 5. Cập nhật thay đổi vào DB local và Firebase
       await ReminderStorage.updateReminder(updatedReminder);
-
-      // 6. Tải lại toàn bộ lịch sử để hiển thị thay đổi
       _syncAndLoad();
     }
   }
@@ -230,23 +220,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                 ),
               ),
-              // ListTile(
-              //   leading: const Icon(Icons.delete_outline, color: Colors.red),
-              //   title: const Text('Xóa chỉ lần này'),
-              //   onTap: () async {
-              //     await ReminderStorage.deleteScheduleOnce(item);
-              //     await _firebaseService.deleteReminder(item['id']);
-              //     Navigator.pop(context);
-              //     _syncAndLoad();
-              //   },
-              // ),
               ListTile(
                 leading:
                 const Icon(Icons.delete_forever, color: Colors.redAccent),
                 title: const Text('Xóa toàn bộ thuốc này'),
                 onTap: () async {
                   await ReminderStorage.deleteAllByTitle(item['title']);
-                  await _firebaseService.deleteAllRemindersByTitle(item['title']);
+                  await _firebaseService
+                      .deleteAllRemindersByTitle(item['title']);
                   Navigator.pop(context);
                   _syncAndLoad();
                 },
@@ -298,7 +279,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Cột timeline bên trái
         Column(
           children: [
             Container(
@@ -318,13 +298,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
             Container(
                 width: 2,
-                height: 180, // Tăng chiều cao để chứa thêm Ngăn thuốc
+                height: 180,
                 color: Colors.grey.shade200),
           ],
         ),
         const SizedBox(width: 16),
-
-        // Nội dung bên phải
         Expanded(
           child: Container(
             margin: const EdgeInsets.only(bottom: 16),
@@ -344,7 +322,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Hàng thời gian + trạng thái + menu
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -353,7 +330,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: color, // Màu giờ khớp với màu trạng thái
+                          color: color,
                         ),
                       ),
                       Row(
@@ -378,7 +355,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                             ),
                           ),
-                          // === POPUP MENU (ĐÃ CẬP NHẬT) ===
                           PopupMenuButton<String>(
                             icon: Icon(Icons.more_vert,
                                 size: 20, color: Colors.grey.shade600),
@@ -386,11 +362,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               if (value == 'delete') {
                                 _deleteSchedule(item);
                               } else if (value == 'edit') {
-                                _editSchedule(item); // <-- Gọi hàm chỉnh sửa
+                                _editSchedule(item);
                               }
                             },
                             itemBuilder: (context) => [
-                              // Nút Chỉnh sửa
                               const PopupMenuItem(
                                 value: 'edit',
                                 child: Row(
@@ -402,7 +377,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   ],
                                 ),
                               ),
-                              // Nút Xóa
                               const PopupMenuItem(
                                 value: 'delete',
                                 child: Row(
@@ -434,18 +408,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         item['description'],
-                        style:
-                        const TextStyle(color: Colors.black54, fontSize: 14),
+                        style: const TextStyle(
+                            color: Colors.black54, fontSize: 14),
                       ),
                     ),
                   const SizedBox(height: 8),
                   Text('Liều lượng: x${item['dosage']}',
                       style:
                       TextStyle(fontSize: 14, color: Colors.grey.shade700)),
-
-                  // === HIỂN THỊ NGĂN THUỐC ===
                   if (item['drawer'] != null) ...[
-                    const SizedBox(height: 6), // Thêm khoảng cách nhỏ
+                    const SizedBox(height: 6),
                     Row(
                       children: [
                         Icon(Icons.inventory_2_outlined,
@@ -461,10 +433,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ],
                     ),
                   ],
-                  // ==========================
-
                   const SizedBox(height: 12),
-
                   if (status == ReminderStatus.pending)
                     Row(
                       children: [
@@ -472,7 +441,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           child: OutlinedButton(
                             onPressed: () => _handleSkip(id, item['title']),
                             style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: Colors.orange.shade600),
+                              side: BorderSide(
+                                  color: Colors.orange.shade600),
                               foregroundColor: Colors.orange.shade600,
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20)),
@@ -483,7 +453,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () => _handleFinish(id, item['title']),
+                            onPressed: () =>
+                                _handleFinish(id, item['title']),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green.shade600,
                               foregroundColor: Colors.white,
@@ -504,7 +475,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // ---------------- UI tổng ----------------
   @override
   Widget build(BuildContext context) {
     final weekDates = _getWeekDates();
@@ -512,14 +482,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
         '${DateFormat('d MMM').format(weekDates.first)} - ${DateFormat('d MMM').format(weekDates.last)}';
 
     return Scaffold(
-      backgroundColor: Colors.grey[50], // Nền xám rất nhạt
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text('Lịch sử uống thuốc',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         elevation: 0,
         backgroundColor: Colors.transparent,
         iconTheme: const IconThemeData(color: Colors.white),
-        // Thêm gradient cho AppBar
         flexibleSpace: Container(
           decoration: BoxDecoration(gradient: _primaryGradient),
         ),
@@ -529,7 +498,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
             onPressed: _syncAndLoad,
           ),
         ],
-        // Đưa bộ chọn tuần vào AppBar
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(50.0),
           child: Padding(
@@ -537,19 +505,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Nút lùi tuần
                 IconButton(
                     onPressed: () => _changeWeek(-1),
                     icon: const Icon(Icons.arrow_back_ios,
                         size: 18, color: Colors.white)),
-
-                // Bọc Text bằng GestureDetector để có thể nhấn
                 GestureDetector(
-                  onTap: _selectDateRangeToJump, // <-- GỌI HÀM CHỌN LỊCH
+                  onTap: _selectDateRangeToJump,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Hiển thị dải ngày
                       Text(
                         weekRange,
                         style: const TextStyle(
@@ -558,14 +522,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             color: Colors.white),
                       ),
                       const SizedBox(width: 8),
-                      // Thêm icon lịch
                       const Icon(Icons.calendar_month_outlined,
                           color: Colors.white, size: 20),
                     ],
                   ),
                 ),
-
-                // Nút tiến tuần
                 IconButton(
                     onPressed: () => _changeWeek(1),
                     icon: const Icon(Icons.arrow_forward_ios,
@@ -577,7 +538,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
       body: Column(
         children: [
-          // Danh sách ngày trong tuần
           Container(
             color: Colors.transparent,
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -644,8 +604,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ),
           ),
-
-          // Timeline hiển thị thuốc
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())

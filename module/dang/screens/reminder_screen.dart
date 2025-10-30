@@ -23,18 +23,22 @@ class _ReminderScreenState extends State<ReminderScreen> {
   String _selectedFrequency = 'Hằng ngày';
   final List<String> _frequencies = [
     'Hằng ngày',
-    'Mỗi 2 ngày',
-    'Mỗi tuần',
-    'Khi cần thiết'
+    'Cách ngày',
+    'Một lần',
+    'Theo số ngày'
   ];
   int _intervalDays = 2;
   int _durationDays = 7;
+  int _customIntervalDays = 1;
+  final _customDaysController = TextEditingController();
+
 
   final List<String> _units = ['viên', 'ml', 'lọ', 'gói', 'liều'];
 
   @override
   void initState() {
     super.initState();
+    _customDaysController.text = _customIntervalDays.toString();
     if (widget.existingReminder != null) {
       _titleController.text = widget.existingReminder!.title;
       _descriptionController.text = widget.existingReminder!.description ?? '';
@@ -57,8 +61,53 @@ class _ReminderScreenState extends State<ReminderScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _customDaysController.dispose();
     super.dispose();
   }
+
+  // Đặt hàm này bên trong class _ReminderScreenState
+  Future<void> _showCustomDaysDialog() async {
+    _customDaysController.text = _customIntervalDays.toString();
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // Người dùng phải nhấn nút để đóng
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Nhập số ngày'),
+          content: TextField(
+            controller: _customDaysController,
+            keyboardType: TextInputType.number,
+            inputFormatters: <TextInputFormatter>[
+              FilteringTextInputFormatter.digitsOnly // Chỉ cho phép nhập số
+            ],
+            decoration: const InputDecoration(
+              hintText: "Nhập số ngày ở đây",
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Hủy'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                setState(() {
+                  _customIntervalDays = int.tryParse(_customDaysController.text) ?? 1;
+                  // Cập nhật lại lựa chọn tần suất
+                  _selectedFrequency = 'Theo số ngày';
+                });
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 
   Future<void> _selectTime(int index) async {
     final time = await showTimePicker(
@@ -127,17 +176,17 @@ class _ReminderScreenState extends State<ReminderScreen> {
         interval = 1;
         endDate = DateTime.now().add(Duration(days: _durationDays));
         break;
-      case 'Mỗi 2 ngày':
+      case 'Cách ngày':
         interval = 2;
         endDate = DateTime.now().add(Duration(days: _durationDays));
         break;
-      case 'Mỗi tuần':
+      case 'Một lần':
         interval = 7;
         endDate = DateTime.now().add(Duration(days: _durationDays));
         break;
-      case 'Khi cần thiết':
-        interval = 9999;
-        endDate = DateTime.now();
+      case 'Theo số ngày':
+        interval = _customIntervalDays;
+        endDate = DateTime.now().add(Duration(days: _durationDays));
         break;
     }
 
@@ -477,7 +526,15 @@ class _ReminderScreenState extends State<ReminderScreen> {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: InkWell(
-                  onTap: () => setState(() => _selectedFrequency = freq),
+                  onTap: () {
+                    // ---- BẮT ĐẦU THAY ĐỔI LOGIC Ở ĐÂY ----
+                    if (freq == 'Theo số ngày') {
+                      _showCustomDaysDialog();
+                    } else {
+                      setState(() => _selectedFrequency = freq);
+                    }
+                    // ---- KẾT THÚC THAY ĐỔI ----
+                  },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
@@ -501,7 +558,9 @@ class _ReminderScreenState extends State<ReminderScreen> {
                     ),
                     child: Center(
                       child: Text(
-                        freq,
+                        freq == 'Theo số ngày'
+                            ? 'Trong $_customIntervalDays ngày'
+                            : freq,
                         style: TextStyle(
                           color: isSelected ? Colors.white : Colors.grey.shade700,
                           fontSize: 16,
