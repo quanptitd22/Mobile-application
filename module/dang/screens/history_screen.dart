@@ -64,8 +64,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   /// 📅 Lọc lịch uống thuốc theo ngày đang chọn
   void _filterByDate() {
-    final start =
-    DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    final start = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+    );
     final end = start.add(const Duration(days: 1));
 
     setState(() {
@@ -203,7 +206,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
         return Padding(
           padding: const EdgeInsets.all(16),
@@ -221,13 +225,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
               ),
               ListTile(
-                leading:
-                const Icon(Icons.delete_forever, color: Colors.redAccent),
+                leading: const Icon(
+                  Icons.delete_forever,
+                  color: Colors.redAccent,
+                ),
                 title: const Text('Xóa toàn bộ thuốc này'),
                 onTap: () async {
                   await ReminderStorage.deleteAllByTitle(item['title']);
-                  await _firebaseService
-                      .deleteAllRemindersByTitle(item['title']);
+                  await _firebaseService.deleteAllRemindersByTitle(
+                    item['title'],
+                  );
                   Navigator.pop(context);
                   _syncAndLoad();
                 },
@@ -296,10 +303,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ],
               ),
             ),
-            Container(
-                width: 2,
-                height: 180,
-                color: Colors.grey.shade200),
+            Container(width: 2, height: 180, color: Colors.grey.shade200),
           ],
         ),
         const SizedBox(width: 16),
@@ -337,7 +341,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: color.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(8),
@@ -356,8 +362,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             ),
                           ),
                           PopupMenuButton<String>(
-                            icon: Icon(Icons.more_vert,
-                                size: 20, color: Colors.grey.shade600),
+                            icon: Icon(
+                              Icons.more_vert,
+                              size: 20,
+                              color: Colors.grey.shade600,
+                            ),
                             onSelected: (value) {
                               if (value == 'delete') {
                                 _deleteSchedule(item);
@@ -370,8 +379,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 value: 'edit',
                                 child: Row(
                                   children: [
-                                    Icon(Icons.edit_outlined,
-                                        size: 20, color: Colors.blue),
+                                    Icon(
+                                      Icons.edit_outlined,
+                                      size: 20,
+                                      color: Colors.blue,
+                                    ),
                                     SizedBox(width: 10),
                                     Text('Chỉnh sửa'),
                                   ],
@@ -381,8 +393,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 value: 'delete',
                                 child: Row(
                                   children: [
-                                    Icon(Icons.delete_outline,
-                                        size: 20, color: Colors.red),
+                                    Icon(
+                                      Icons.delete_outline,
+                                      size: 20,
+                                      color: Colors.red,
+                                    ),
                                     SizedBox(width: 10),
                                     Text('Xóa thuốc'),
                                   ],
@@ -409,26 +424,33 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       child: Text(
                         item['description'],
                         style: const TextStyle(
-                            color: Colors.black54, fontSize: 14),
+                          color: Colors.black54,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   const SizedBox(height: 8),
-                  Text('Liều lượng: x${item['dosage']}',
-                      style:
-                      TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+                  Text(
+                    'Liều lượng: x${item['dosage']}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                  ),
                   if (item['drawer'] != null) ...[
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Icon(Icons.inventory_2_outlined,
-                            size: 16, color: Colors.grey.shade700),
+                        Icon(
+                          Icons.inventory_2_outlined,
+                          size: 16,
+                          color: Colors.grey.shade700,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           'Ngăn: ${item['drawer']}',
                           style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade700,
-                              fontWeight: FontWeight.w500),
+                            fontSize: 14,
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
@@ -441,11 +463,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           child: OutlinedButton(
                             onPressed: () => _handleSkip(id, item['title']),
                             style: OutlinedButton.styleFrom(
-                              side: BorderSide(
-                                  color: Colors.orange.shade600),
+                              side: BorderSide(color: Colors.orange.shade600),
                               foregroundColor: Colors.orange.shade600,
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20)),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
                             ),
                             child: const Text('Bỏ qua'),
                           ),
@@ -453,13 +475,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () =>
-                                _handleFinish(id, item['title']),
+                            onPressed: () => _handleFinish(id, item['title']),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green.shade600,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20)),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
                             ),
                             child: const Text('Đã uống'),
                           ),
@@ -484,8 +506,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Lịch sử uống thuốc',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Lịch sử uống thuốc',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         elevation: 0,
         backgroundColor: Colors.transparent,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -506,9 +530,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                    onPressed: () => _changeWeek(-1),
-                    icon: const Icon(Icons.arrow_back_ios,
-                        size: 18, color: Colors.white)),
+                  onPressed: () => _changeWeek(-1),
+                  icon: const Icon(
+                    Icons.arrow_back_ios,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ),
                 GestureDetector(
                   onTap: _selectDateRangeToJump,
                   child: Row(
@@ -517,20 +545,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       Text(
                         weekRange,
                         style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      const Icon(Icons.calendar_month_outlined,
-                          color: Colors.white, size: 20),
+                      const Icon(
+                        Icons.calendar_month_outlined,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ],
                   ),
                 ),
                 IconButton(
-                    onPressed: () => _changeWeek(1),
-                    icon: const Icon(Icons.arrow_forward_ios,
-                        size: 18, color: Colors.white)),
+                  onPressed: () => _changeWeek(1),
+                  icon: const Icon(
+                    Icons.arrow_forward_ios,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ),
               ],
             ),
           ),
@@ -566,36 +602,38 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: selected
                             ? [
-                          BoxShadow(
-                            color: Colors.blue.withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          )
-                        ]
+                                BoxShadow(
+                                  color: Colors.blue.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ]
                             : [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          )
-                        ],
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(DateFormat('E').format(d),
-                              style: TextStyle(
-                                  color: selected
-                                      ? Colors.white
-                                      : Colors.black54)),
+                          Text(
+                            DateFormat('E').format(d),
+                            style: TextStyle(
+                              color: selected ? Colors.white : Colors.black54,
+                            ),
+                          ),
                           const SizedBox(height: 6),
-                          Text('${d.day}',
-                              style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: selected
-                                      ? Colors.white
-                                      : Colors.black87)),
+                          Text(
+                            '${d.day}',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: selected ? Colors.white : Colors.black87,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -609,17 +647,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredSchedules.isEmpty
                 ? Center(
-                child: Text(
-                  'Không có lịch trình nào',
-                  style: TextStyle(
-                      color: Colors.grey.shade600, fontSize: 16),
-                ))
+                    child: Text(
+                      'Không có lịch trình nào',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  )
                 : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _filteredSchedules.length,
-              itemBuilder: (context, i) =>
-                  _buildTimelineCard(_filteredSchedules[i]),
-            ),
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredSchedules.length,
+                    itemBuilder: (context, i) =>
+                        _buildTimelineCard(_filteredSchedules[i]),
+                  ),
           ),
         ],
       ),

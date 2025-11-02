@@ -55,6 +55,10 @@ class _HomeScreenState extends State<HomeScreen> {
           endDate: data['endDate'] != null
               ? DateTime.tryParse(data['endDate'])
               : null,
+          timesPerDay: data['timesPerDay'] is List
+              ? List<String>.from(data['timesPerDay'])
+              : ['08:00'],
+          drawer: data['drawer'] ?? 1,
         );
       }).toList();
     });
@@ -70,21 +74,56 @@ class _HomeScreenState extends State<HomeScreen> {
       final user = _auth.currentUser;
       if (user == null) return;
 
-      await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('reminders')
-          .add({
-        'title': result.title,
-        'time': result.time.toIso8601String(),
-        'description': result.description,
-        'dosage': result.dosage,
-        'frequency': result.frequency,
-        'intervalDays': result.intervalDays,
-        'endDate': result.endDate?.toIso8601String(),
-      });
+      try {
+        // 1️⃣ Lưu vào Firestore
+        await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('reminders')
+            .doc(result.id)
+            .set({
+          'id': result.id,
+          'title': result.title,
+          'time': result.time.toIso8601String(),
+          'description': result.description,
+          'dosage': result.dosage,
+          'frequency': result.frequency,
+          'intervalDays': result.intervalDays,
+          'endDate': result.endDate?.toIso8601String(),
+          'timesPerDay': result.timesPerDay,
+          'drawer': result.drawer,
+        });
 
-      await _loadReminders();
+        // 2️⃣ ⭐ QUAN TRỌNG: Lưu vào Local Storage (SharedPreferences)
+        await ReminderStorage.saveReminder(result);
+
+        // 3️⃣ Cập nhật giao diện
+        await _loadReminders();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Đã thêm: ${result.title}'),
+              backgroundColor: Colors.green.shade600,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Lỗi: $e'),
+              backgroundColor: Colors.red.shade600,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        print('❌ Lỗi khi thêm reminder: $e');
+      }
     }
   }
 
@@ -92,19 +131,44 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('reminders')
-        .doc(reminder.id)
-        .delete();
+    try {
+      // 1️⃣ Xóa từ Firestore
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('reminders')
+          .doc(reminder.id)
+          .delete();
 
-    await _loadReminders();
+      // 2️⃣ ⭐ Xóa từ Local Storage
+      await ReminderStorage.deleteReminder(reminder.id);
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Đã xóa reminder")),
-      );
+      // 3️⃣ Cập nhật giao diện
+      await _loadReminders();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Đã xóa: ${reminder.title}'),
+            backgroundColor: Colors.orange.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Lỗi khi xóa: $e'),
+            backgroundColor: Colors.red.shade600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      print('❌ Lỗi khi xóa reminder: $e');
     }
   }
 
@@ -234,7 +298,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     radius: 35,
                     backgroundColor: Colors.white,
                     backgroundImage: NetworkImage(
-                      _auth.currentUser?.photoURL ?? "https://i.pravatar.cc/150?img=5",
+                      _auth.currentUser?.photoURL ??
+                          "https://i.pravatar.cc/150?img=5",
                     ),
                   ),
                   const SizedBox(height: 15),
@@ -285,7 +350,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.pop(context);
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const HistoryScreen()),
+                        MaterialPageRoute(
+                            builder: (context) => const HistoryScreen()),
                       );
                     },
                   ),
@@ -311,7 +377,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () async {
                       await _auth.signOut();
                       if (mounted) {
-                        Navigator.of(context).pushReplacementNamed('/login');
+                        Navigator.of(context)
+                            .pushReplacementNamed('/login');
                       }
                     },
                   ),
@@ -419,7 +486,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 radius: 30,
                 backgroundColor: Colors.white,
                 backgroundImage: NetworkImage(
-                  _auth.currentUser?.photoURL ?? "https://www.cambridgebiotherapies.com/wp-content/uploads/what-is-medication-management.jpg",
+                  _auth.currentUser?.photoURL ??
+                      "https://www.cambridgebiotherapies.com/wp-content/uploads/what-is-medication-management.jpg",
                 ),
               ),
             ],
@@ -449,17 +517,24 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          Expanded(child: _buildStatCard('3/3', 'Đã uống', Icons.check_circle, Colors.green)),
+          Expanded(
+              child: _buildStatCard('3/3', 'Đã uống', Icons.check_circle,
+                  Colors.green)),
           const SizedBox(width: 12),
-          Expanded(child: _buildStatCard('85%', 'Đã bỏ lỡ', Icons.cancel_outlined, Colors.red)),
+          Expanded(
+              child: _buildStatCard(
+                  '85%', 'Đã bỏ lỡ', Icons.cancel_outlined, Colors.red)),
           const SizedBox(width: 12),
-          Expanded(child: _buildStatCard('${reminders.length}', 'Sắp tới', Icons.access_time, Colors.blue)),
+          Expanded(
+              child: _buildStatCard('${reminders.length}', 'Sắp tới',
+                  Icons.access_time, Colors.blue)),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String value, String label, IconData icon, Color color) {
+  Widget _buildStatCard(
+      String value, String label, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -541,12 +616,12 @@ class _HomeScreenState extends State<HomeScreen> {
           reminders.isEmpty
               ? _buildEmptyState()
               : Column(
-            children: displayedReminders.asMap().entries.map((entry) {
-              int index = entry.key;
-              Reminder reminder = entry.value;
-              return _buildMedicationItem(reminder, index);
-            }).toList(),
-          ),
+                  children: displayedReminders.asMap().entries.map((entry) {
+                    int index = entry.key;
+                    Reminder reminder = entry.value;
+                    return _buildMedicationItem(reminder, index);
+                  }).toList(),
+                ),
         ],
       ),
     );
@@ -682,22 +757,55 @@ class _HomeScreenState extends State<HomeScreen> {
           if (result != null && result is Reminder) {
             final user = _auth.currentUser;
             if (user != null) {
-              await _firestore
-                  .collection('users')
-                  .doc(user.uid)
-                  .collection('reminders')
-                  .doc(reminder.id)
-                  .update({
-                'title': result.title,
-                'time': result.time.toIso8601String(),
-                'description': result.description,
-                'dosage': result.dosage,
-                'frequency': result.frequency,
-                'intervalDays': result.intervalDays,
-                'endDate': result.endDate?.toIso8601String(),
-              });
+              try {
+                // 1️⃣ Cập nhật Firestore
+                await _firestore
+                    .collection('users')
+                    .doc(user.uid)
+                    .collection('reminders')
+                    .doc(reminder.id)
+                    .update({
+                  'title': result.title,
+                  'time': result.time.toIso8601String(),
+                  'description': result.description,
+                  'dosage': result.dosage,
+                  'frequency': result.frequency,
+                  'intervalDays': result.intervalDays,
+                  'endDate': result.endDate?.toIso8601String(),
+                  'timesPerDay': result.timesPerDay,
+                  'drawer': result.drawer,
+                });
 
-              await _loadReminders();
+                // 2️⃣ ⭐ Cập nhật Local Storage
+                await ReminderStorage.updateReminder(result);
+
+                // 3️⃣ Tải lại
+                await _loadReminders();
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✅ Đã cập nhật: ${result.title}'),
+                      backgroundColor: Colors.blue.shade600,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('❌ Lỗi khi cập nhật: $e'),
+                      backgroundColor: Colors.red.shade600,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+                print('❌ Lỗi khi cập nhật: $e');
+              }
             }
           }
           return false; // Không xóa item
@@ -717,7 +825,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Xóa', style: TextStyle(color: Colors.red)),
+                  child: const Text('Xóa',
+                      style: TextStyle(color: Colors.red)),
                 ),
               ],
             );
@@ -773,8 +882,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
-            ]
-        ),
+            ]),
         child: Row(
           children: [
             Container(
