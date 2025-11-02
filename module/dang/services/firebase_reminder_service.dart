@@ -171,7 +171,7 @@ class FirebaseReminderService {
           'frequency': data['frequency'] ?? 'Hằng ngày',
           'intervalDays': data['intervalDays'] ?? 1,
           'endDate': data['endDate'] ?? '',
-          'timesPerDay': data['timesPerDay'] ?? ['08:00'],
+          'timesPerDay': List<String>.from(data['timesPerDay'] ?? []),
         });
       }
 

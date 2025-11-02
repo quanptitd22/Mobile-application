@@ -55,6 +55,19 @@ class Reminder {
       final minute = time.minute.toString().padLeft(2, '0');
       return '$hour:$minute';
     }
+    // Lấy danh sách giờ uống trong ngày
+    List<String> parsedTimes = [];
+    if (json['timesPerDay'] != null &&
+        json['timesPerDay'] is List &&
+        (json['timesPerDay'] as List).isNotEmpty) {
+      parsedTimes = List<String>.from(json['timesPerDay']);
+    } else if (json['time'] != null &&
+        DateTime.tryParse(json['time'].toString()) != null) {
+      // backward-compatible
+      parsedTimes = [formatTime(DateTime.parse(json['time'].toString()))];
+    } else {
+      parsedTimes = ["08:00"];
+    }
     return Reminder(
       drawer: json['drawer'] is int ? json['drawer'] : 1,
       id: json['id']?.toString() ?? '',
@@ -75,17 +88,7 @@ class Reminder {
       endDate: json['endDate'] != null && json['endDate'].toString().isNotEmpty
           ? DateTime.tryParse(json['endDate'].toString())
           : null,
-      timesPerDay: (json['timesPerDay'] != null &&
-          json['timesPerDay'] is List &&
-          (json['timesPerDay'] as List).isNotEmpty)
-          ? List<String>.from(json['timesPerDay'])
-          : [
-        if (json['time'] != null &&
-            DateTime.tryParse(json['time'].toString()) != null)
-          formatTime(DateTime.parse(json['time'].toString()))
-        else
-          "08:00"
-      ],
+      timesPerDay: parsedTimes,
     );
   }
 
