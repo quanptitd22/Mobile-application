@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:firebase_core/firebase_core.dart'; // 👈 Thêm dòng này
+import 'package:firebase_core/firebase_core.dart';
 import 'screens/home_screen.dart';
-import 'package:medireminder_app/firebase_options.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // 👈 Cần có khi gọi async
-  await Firebase.initializeApp(// 👈 Dành cho firebase_options.dart
+  WidgetsFlutterBinding.ensureInitialized(); //  Cần có khi gọi async
+  await Firebase.initializeApp(// Dành cho firebase_options.dart
   );
   runApp(const MyApp());
 }

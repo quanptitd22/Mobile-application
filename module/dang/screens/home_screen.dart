@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'reminder_screen.dart';
 import 'history_screen.dart';
+import 'drawer_status_screen.dart';
 import '../models/reminder_storage.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -360,11 +361,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: Icons.info,
                     title: 'Trạng thái hộp thuốc',
                     gradient: LinearGradient(
-                      colors: [Colors.green.shade500, Colors.green.shade600],
+                      colors: [Colors.greenAccent, Colors.green],
                     ),
                     onTap: () {
-                      Navigator.pop(context);
-                      // Thêm logic cho chức năng theo dõi
+                      Navigator.pop(context); // đóng Drawer trước
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const DrawerStatusScreen()),
+                      );
                     },
                   ),
                   const SizedBox(height: 400),
