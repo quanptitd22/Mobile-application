@@ -19,15 +19,14 @@ android {
     }
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
-        // Kotlin DSL: bật coreLibraryDesugaring
-        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
-        jvmTarget = "11"
-    }
+        jvmTarget = JavaVersion.VERSION_11.toString()
+    }   
 
     buildTypes {
         release {
@@ -43,8 +42,8 @@ flutter {
 dependencies {
     implementation(kotlin("stdlib-jdk7"))
 
-    // Kotlin DSL: core library desugaring
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+    // Kotlin DSL: core library desugaring - bumped to satisfy plugin requirements
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 dependencies {
     // Import the Firebase BoM (Bill of Materials)

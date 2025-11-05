@@ -64,19 +64,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   /// 📅 Lọc lịch uống thuốc theo ngày đang chọn
   void _filterByDate() {
-    final start = DateTime(
+    final selectedDay = DateTime(
       _selectedDate.year,
       _selectedDate.month,
       _selectedDate.day,
     );
-    final end = start.add(const Duration(days: 1));
 
     setState(() {
       _filteredSchedules = _allSchedules.where((item) {
-        final t = item['time'] as DateTime;
-        return t.isAfter(start.subtract(const Duration(seconds: 1))) &&
-            t.isBefore(end);
+        final scheduleTime = item['time'] as DateTime;
+        final scheduleDay = DateTime(
+          scheduleTime.year,
+          scheduleTime.month,
+          scheduleTime.day,
+        );
+
+        // Chỉ hiện thuốc khi ngày được chọn trùng với ngày trong lịch
+        return scheduleDay.isAtSameMomentAs(selectedDay);
       }).toList();
+
+      // Sắp xếp theo thời gian
+      _filteredSchedules.sort((a, b) {
+        final timeA = a['time'] as DateTime;
+        final timeB = b['time'] as DateTime;
+        return timeA.compareTo(timeB);
+      });
     });
   }
 
@@ -229,7 +241,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   Icons.delete_forever,
                   color: Colors.redAccent,
                 ),
-                title: const Text('Xóa toàn bộ thuốc này'),
+                title: const Text('Xóa lịch trình'),
                 onTap: () async {
                   await ReminderStorage.deleteAllByTitle(item['title']);
                   await _firebaseService.deleteAllRemindersByTitle(
@@ -375,20 +387,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               }
                             },
                             itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.edit_outlined,
-                                      size: 20,
-                                      color: Colors.blue,
-                                    ),
-                                    SizedBox(width: 10),
-                                    Text('Chỉnh sửa'),
-                                  ],
-                                ),
-                              ),
+                              // const PopupMenuItem(
+                              //   value: 'edit',
+                              //   child: Row(
+                              //     children: [
+                              //       Icon(
+                              //         Icons.edit_outlined,
+                              //         size: 20,
+                              //         color: Colors.blue,
+                              //       ),
+                              //       SizedBox(width: 10),
+                              //       Text('Chỉnh sửa'),
+                              //     ],
+                              //   ),
+                              // ),
                               const PopupMenuItem(
                                 value: 'delete',
                                 child: Row(

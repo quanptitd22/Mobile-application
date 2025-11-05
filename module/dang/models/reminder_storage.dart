@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/firebase_reminder_service.dart';
+import '../services/notification_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -52,7 +53,7 @@ class Reminder {
     List<String> parseTimes(dynamic value, DateTime time) {
       if (value == null) {
         return [
-          "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}"
+          "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}",
         ];
       } else if (value is List) {
         return value.map((e) => e.toString()).toList();
@@ -66,8 +67,8 @@ class Reminder {
     final parsedTime = json['time'] is Timestamp
         ? (json['time'] as Timestamp).toDate()
         : (json['time'] != null && json['time'].toString().isNotEmpty
-        ? DateTime.tryParse(json['time'].toString()) ?? DateTime.now()
-        : DateTime.now());
+              ? DateTime.tryParse(json['time'].toString()) ?? DateTime.now()
+              : DateTime.now());
 
     return Reminder(
       drawer: json['drawer'] is int ? json['drawer'] : 1,
@@ -100,9 +101,11 @@ class Reminder {
     DateTime current = DateTime(time.year, time.month, time.day);
     DateTime end = endDate ?? current.add(const Duration(days: 30));
 
-    for (DateTime d = current;
-    !d.isAfter(end);
-    d = d.add(Duration(days: intervalDays))) {
+    for (
+      DateTime d = current;
+      !d.isAfter(end);
+      d = d.add(Duration(days: intervalDays))
+    ) {
       for (var t in timesPerDay) {
         if (t.isEmpty) continue;
         final parts = t.split(':');
@@ -155,6 +158,10 @@ class ReminderStorage {
 
     final firebaseService = FirebaseReminderService();
     await firebaseService.addReminder(reminder);
+
+    // ✅ Đặt thông báo cho reminder mới
+    await NotificationService().scheduleReminder(reminder);
+    print("🔔 Đã đặt thông báo cho: ${reminder.title}");
   }
 
   /// 🔸 Cập nhật reminder
@@ -173,6 +180,10 @@ class ReminderStorage {
 
       final firebaseService = FirebaseReminderService();
       await firebaseService.updateReminder(updatedReminder);
+
+      // ✅ Cập nhật thông báo
+      await NotificationService().scheduleReminder(updatedReminder);
+      print("🔔 Đã cập nhật thông báo cho: ${updatedReminder.title}");
     }
   }
 
@@ -190,6 +201,24 @@ class ReminderStorage {
 
     final firebaseService = FirebaseReminderService();
     await firebaseService.deleteReminder(id);
+
+    // ✅ Hủy thông báo
+    await NotificationService().cancelReminderNotifications(id);
+    print("🔕 Đã hủy thông báo cho reminder: $id");
+  }
+
+  static Future<void> rescheduleAllNotifications() async {
+    final reminders = await loadReminders();
+
+    // Hủy tất cả thông báo cũ
+    await NotificationService().cancelAllNotifications();
+
+    // Đặt lại thông báo cho tất cả reminders
+    for (var reminder in reminders) {
+      await NotificationService().scheduleReminder(reminder);
+    }
+
+    print("🔄 Đã đặt lại ${reminders.length} thông báo");
   }
 
   /// 🔸 Lưu toàn bộ reminders xuống SharedPreferences
@@ -205,21 +234,37 @@ class ReminderStorage {
     List<Map<String, dynamic>> schedules = [];
 
     for (var reminder in reminders) {
+      // Sử dụng ngày bắt đầu từ reminder
+      final startDate = reminder.time;
       final schedule = reminder.generateSchedule();
+
       for (var time in schedule) {
+        // Tạo DateTime với ngày từ lịch và giờ từ time
+        final scheduleDateTime = DateTime(
+          time.year,
+          time.month,
+          time.day,
+          time.hour,
+          time.minute,
+        );
+
         schedules.add({
-          'id': "${reminder.id}_${time.toIso8601String()}",
+          'id': "${reminder.id}_${scheduleDateTime.toIso8601String()}",
           'title': reminder.title,
           'description': reminder.description,
           'dosage': reminder.dosage,
-          'time': time,
+          'time': scheduleDateTime,
           'drawer': reminder.drawer,
           'reminderId': reminder.id,
+          'frequency': reminder.frequency,
+          'startDate': startDate,
         });
       }
     }
 
-    schedules.sort((a, b) => (a['time'] as DateTime).compareTo(b['time'] as DateTime));
+    schedules.sort(
+      (a, b) => (a['time'] as DateTime).compareTo(b['time'] as DateTime),
+    );
     return schedules;
   }
 
@@ -236,7 +281,9 @@ class ReminderStorage {
 
       if (firebaseReminders.isNotEmpty) {
         await saveAllReminders(firebaseReminders);
-        print("✅ Đã đồng bộ ${firebaseReminders.length} reminders từ Firebase xuống local.");
+        print(
+          "✅ Đã đồng bộ ${firebaseReminders.length} reminders từ Firebase xuống local.",
+        );
       } else {
         print("ℹ️ Không có dữ liệu trên Firebase.");
       }
@@ -292,7 +339,10 @@ class ReminderStorage {
         data.forEach((key, value) async {
           final item = Map<String, dynamic>.from(value);
           if (item['title'] == title) {
-            await FirebaseDatabase.instance.ref('reminders').child(key).remove();
+            await FirebaseDatabase.instance
+                .ref('reminders')
+                .child(key)
+                .remove();
           }
         });
       }
@@ -300,4 +350,14 @@ class ReminderStorage {
       print('Error deleting reminders by title: $e');
     }
   }
+
+  /// Generate a stable notification id for a reminder occurrence
+  static int _notificationIdFor(String reminderId, DateTime time) {
+    // Ensure a positive 32-bit int
+    return (reminderId.hashCode ^ time.millisecondsSinceEpoch) & 0x7fffffff;
+  }
+
+  /// Public wrapper to get a notification id for external callers
+  static int notificationIdFor(String reminderId, DateTime time) =>
+      _notificationIdFor(reminderId, time);
 }
