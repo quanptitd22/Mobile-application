@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'reminder_screen.dart';
 import 'history_screen.dart';
 import 'drawer_status_screen.dart';
 import '../models/reminder_storage.dart';
-import '../services/notification_service.dart';
+import '../services/firebase_reminder_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,40 +17,38 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseReminderService _firebaseService = FirebaseReminderService();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   List<Reminder> reminders = [];
   int _currentIndex = 0;
-  Timer? _refreshTimer;
+  
+  // 📊 Biến lưu thống kê
+  Map<String, int> _statistics = {
+    'completed': 0,
+    'skipped': 0,
+    'pending': 0,
+    'total': 0,
+  };
 
   @override
   void initState() {
     super.initState();
     _loadReminders();
-    // Refresh UI periodically so that past schedule entries disappear
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (!mounted) return;
-      setState(() {});
-    });
-    // Initialize notification service and schedule existing reminders
-    () async {
-      try {
-        await NotificationService().initialize();
-        final existing = await ReminderStorage.loadReminders();
-        for (var r in existing) {
-          // Use service helper to schedule all times for this reminder
-          await NotificationService().scheduleReminder(r);
-        }
-      } catch (e) {
-        print('⚠️ Lỗi khi khởi tạo NotificationService: $e');
-      }
-    }();
+    _loadStatistics();
   }
 
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
+  /// 📊 Tải thống kê từ Firebase
+  Future<void> _loadStatistics() async {
+    try {
+      final stats = await _firebaseService.getStatusStatistics();
+      setState(() {
+        _statistics = stats;
+      });
+      print("📊 Đã tải thống kê: $_statistics");
+    } catch (e) {
+      print("❌ Lỗi khi tải thống kê: $e");
+    }
   }
 
   Future<void> _loadReminders() async {
@@ -90,6 +87,9 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }).toList();
     });
+    
+    // Tải lại thống kê sau khi load reminders
+    await _loadStatistics();
   }
 
   Future<void> _addReminder() async {
@@ -110,37 +110,20 @@ class _HomeScreenState extends State<HomeScreen> {
             .collection('reminders')
             .doc(result.id)
             .set({
-              'id': result.id,
-              'title': result.title,
-              'time': result.time.toIso8601String(),
-              'description': result.description,
-              'dosage': result.dosage,
-              'frequency': result.frequency,
-              'intervalDays': result.intervalDays,
-              'endDate': result.endDate?.toIso8601String(),
-              'timesPerDay': result.timesPerDay,
-              'drawer': result.drawer,
-            });
+          'id': result.id,
+          'title': result.title,
+          'time': result.time.toIso8601String(),
+          'description': result.description,
+          'dosage': result.dosage,
+          'frequency': result.frequency,
+          'intervalDays': result.intervalDays,
+          'endDate': result.endDate?.toIso8601String(),
+          'timesPerDay': result.timesPerDay,
+          'drawer': result.drawer,
+        });
 
         // 2️⃣ ⭐ QUAN TRỌNG: Lưu vào Local Storage (SharedPreferences)
         await ReminderStorage.saveReminder(result);
-
-        // Show how many pending notifications are scheduled (debug)
-        try {
-          final pending = await NotificationService().getPendingNotifications();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  '🔔 Đã lên lịch ${pending.length} thông báo cho thiết bị.',
-                ),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        } catch (e) {
-          // ignore
-        }
 
         // 3️⃣ Cập nhật giao diện
         await _loadReminders();
@@ -239,7 +222,11 @@ class _HomeScreenState extends State<HomeScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.blue.shade50, Colors.white, Colors.purple.shade50],
+            colors: [
+              Colors.blue.shade50,
+              Colors.white,
+              Colors.purple.shade50,
+            ],
           ),
         ),
         child: SafeArea(
@@ -293,37 +280,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        child: GestureDetector(
-          onLongPress: () async {
-            try {
-              await NotificationService().initialize();
-              await NotificationService().showTestNotification();
-              final pending = await NotificationService()
-                  .getPendingNotifications();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '🔔 Test: Đã gửi thông báo thử; pending=${pending.length}',
-                    ),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
-            } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('❌ Lỗi khi gửi test thông báo: $e')),
-                );
-              }
-            }
-          },
-          child: FloatingActionButton(
-            onPressed: _addReminder,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            child: const Icon(Icons.add, size: 32),
-          ),
+        child: FloatingActionButton(
+          onPressed: _addReminder,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: const Icon(Icons.add, size: 32),
         ),
       ),
 
@@ -340,7 +301,11 @@ class _HomeScreenState extends State<HomeScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.blue.shade50, Colors.white, Colors.purple.shade50],
+            colors: [
+              Colors.blue.shade50,
+              Colors.white,
+              Colors.purple.shade50,
+            ],
           ),
         ),
         child: Column(
@@ -377,7 +342,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 5),
                   Text(
                     _auth.currentUser?.email ?? '',
-                    style: TextStyle(color: Colors.blue.shade100, fontSize: 14),
+                    style: TextStyle(
+                      color: Colors.blue.shade100,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -411,9 +379,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const HistoryScreen(),
-                        ),
-                      );
+                            builder: (context) => const HistoryScreen()),
+                      ).then((_) {
+                        // Tải lại thống kê khi quay về từ màn hình lịch sử
+                        _loadStatistics();
+                      });
                     },
                   ),
                   const SizedBox(height: 10),
@@ -424,7 +394,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       colors: [Colors.greenAccent, Colors.green],
                     ),
                     onTap: () {
-                      Navigator.pop(context); // đóng Drawer trước
+                      Navigator.pop(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => const DrawerStatusScreen()),
@@ -441,7 +411,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () async {
                       await _auth.signOut();
                       if (mounted) {
-                        Navigator.of(context).pushReplacementNamed('/login');
+                        Navigator.of(context)
+                            .pushReplacementNamed('/login');
                       }
                     },
                   ),
@@ -560,7 +531,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Greeting
           const Center(
             child: Text(
-              'Xin chào ',
+              'Xin chào',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 28,
@@ -574,15 +545,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Stats cards
+  // Stats cards với dữ liệu thực
   Widget _buildStatsCards() {
+    // Tính phần trăm đã bỏ lỡ
+    final total = _statistics['total'] ?? 1;
+    final skipped = _statistics['skipped'] ?? 0;
+    final skippedPercent = total > 0 ? ((skipped / total) * 100).round() : 0;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
           Expanded(
             child: _buildStatCard(
-              '3/3',
+              '${_statistics['completed'] ?? 0}/${total}',
               'Đã uống',
               Icons.check_circle,
               Colors.green,
@@ -591,7 +567,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: _buildStatCard(
-              '85%',
+              '$skippedPercent%',
               'Đã bỏ lỡ',
               Icons.cancel_outlined,
               Colors.red,
@@ -600,7 +576,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: _buildStatCard(
-              '${reminders.length}',
+              '${_statistics['pending'] ?? 0}',
               'Sắp tới',
               Icons.access_time,
               Colors.blue,
@@ -612,11 +588,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStatCard(
-    String value,
-    String label,
-    IconData icon,
-    Color color,
-  ) {
+      String value, String label, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -658,9 +630,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Lịch uống thuốc hôm nay
   Widget _buildTodaySchedule() {
-    final todaySchedules = _getTodayUpcomingSchedules();
-    final displayed = todaySchedules.take(3).toList();
-    final hasMore = todaySchedules.length > 3;
+    final displayedReminders = reminders.take(3).toList();
+    final hasMore = reminders.length > 3;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -682,7 +653,10 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               const Text(
                 'Lịch uống thuốc hôm nay',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               if (hasMore)
                 TextButton(
@@ -693,225 +667,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 16),
 
-          todaySchedules.isEmpty
+          reminders.isEmpty
               ? _buildEmptyState()
               : Column(
-                  children: displayed.asMap().entries.map((entry) {
+                  children: displayedReminders.asMap().entries.map((entry) {
                     int index = entry.key;
-                    final schedule = entry.value; // Map with reminder + time
-                    return _buildScheduleItem(schedule, index);
+                    Reminder reminder = entry.value;
+                    return _buildMedicationItem(reminder, index);
                   }).toList(),
                 ),
         ],
-      ),
-    );
-  }
-
-  /// Trả về danh sách các occurrence (map) của lịch hôm nay mà chưa qua thời gian hiện tại
-  List<Map<String, dynamic>> _getTodayUpcomingSchedules() {
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
-
-    List<Map<String, dynamic>> schedules = [];
-
-    for (var reminder in reminders) {
-      final occurrences = reminder.generateSchedule();
-      for (var occ in occurrences) {
-        if (occ.isBefore(todayStart) || occ.isAfter(todayEnd)) continue;
-        // Keep only upcoming (not past) occurrences for today
-        if (occ.isBefore(now)) continue;
-
-        schedules.add({'reminder': reminder, 'time': occ});
-      }
-    }
-
-    schedules.sort(
-      (a, b) => (a['time'] as DateTime).compareTo(b['time'] as DateTime),
-    );
-    return schedules;
-  }
-
-  Widget _buildScheduleItem(Map<String, dynamic> schedule, int index) {
-    final Reminder reminder = schedule['reminder'] as Reminder;
-    final DateTime time = schedule['time'] as DateTime;
-    final color = _getMedicationColor(index);
-
-    return Dismissible(
-      key: Key('${reminder.id}_${time.toIso8601String()}'),
-      confirmDismiss: (direction) async {
-        // For schedule occurrences we reuse same edit/delete behavior as for full reminders
-        if (direction == DismissDirection.startToEnd) {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ReminderScreen(existingReminder: reminder),
-            ),
-          );
-
-          if (result != null && result is Reminder) {
-            final user = _auth.currentUser;
-            if (user != null) {
-              try {
-                await _firestore
-                    .collection('users')
-                    .doc(user.uid)
-                    .collection('reminders')
-                    .doc(reminder.id)
-                    .update({
-                      'title': result.title,
-                      'time': result.time.toIso8601String(),
-                      'description': result.description,
-                      'dosage': result.dosage,
-                      'frequency': result.frequency,
-                      'intervalDays': result.intervalDays,
-                      'endDate': result.endDate?.toIso8601String(),
-                      'timesPerDay': result.timesPerDay,
-                      'drawer': result.drawer,
-                    });
-
-                await ReminderStorage.updateReminder(result);
-                await _loadReminders();
-              } catch (e) {
-                print('❌ Lỗi khi cập nhật: $e');
-              }
-            }
-          }
-          return false;
-        }
-
-        return await showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('Xác nhận'),
-              content: const Text('Bạn muốn xóa lịch nhắc này?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Hủy'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Xóa', style: TextStyle(color: Colors.red)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-      onDismissed: (direction) {
-        if (direction == DismissDirection.endToStart) {
-          _deleteReminder(reminder);
-        }
-      },
-      background: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.blue.shade400, Colors.purple.shade400],
-          ),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.only(left: 20),
-        child: const Icon(Icons.edit, color: Colors.white, size: 28),
-      ),
-      secondaryBackground: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        child: const Icon(Icons.delete, color: Colors.white, size: 28),
-      ),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 15,
-              offset: const Offset(0, 4),
-              spreadRadius: 0,
-            ),
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: const Icon(
-                Icons.medication,
-                color: Colors.white,
-                size: 28,
-              ),
-            ),
-            const SizedBox(width: 16),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    reminder.title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${reminder.dosage} viên',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}",
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Sắp tới',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1018,7 +783,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 16),
           Text(
             'Chưa có lịch nhắc nào',
-            style: TextStyle(color: Colors.grey.shade400, fontSize: 16),
+            style: TextStyle(
+              color: Colors.grey.shade400,
+              fontSize: 16,
+            ),
           ),
         ],
       ),
@@ -1051,16 +819,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     .collection('reminders')
                     .doc(reminder.id)
                     .update({
-                      'title': result.title,
-                      'time': result.time.toIso8601String(),
-                      'description': result.description,
-                      'dosage': result.dosage,
-                      'frequency': result.frequency,
-                      'intervalDays': result.intervalDays,
-                      'endDate': result.endDate?.toIso8601String(),
-                      'timesPerDay': result.timesPerDay,
-                      'drawer': result.drawer,
-                    });
+                  'title': result.title,
+                  'time': result.time.toIso8601String(),
+                  'description': result.description,
+                  'dosage': result.dosage,
+                  'frequency': result.frequency,
+                  'intervalDays': result.intervalDays,
+                  'endDate': result.endDate?.toIso8601String(),
+                  'timesPerDay': result.timesPerDay,
+                  'drawer': result.drawer,
+                });
 
                 // 2️⃣ ⭐ Cập nhật Local Storage
                 await ReminderStorage.updateReminder(result);
@@ -1111,7 +879,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Xóa', style: TextStyle(color: Colors.red)),
+                  child: const Text('Xóa',
+                      style: TextStyle(color: Colors.red)),
                 ),
               ],
             );
@@ -1149,23 +918,25 @@ class _HomeScreenState extends State<HomeScreen> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 15,
-              offset: const Offset(0, 4),
-              spreadRadius: 0,
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: color.withOpacity(0),
+              width: 1.5,
             ),
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 15,
+                offset: const Offset(0, 4),
+                spreadRadius: 0,
+              ),
+              BoxShadow(
+                color: color.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ]),
         child: Row(
           children: [
             Container(
@@ -1197,7 +968,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 4),
                   Text(
                     '${reminder.dosage} viên',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       color: Colors.black,
                       fontWeight: FontWeight.bold,
@@ -1218,7 +989,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
+                const Text(
                   'Sắp tới',
                   style: TextStyle(
                     fontSize: 12,
@@ -1268,7 +1039,10 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const HistoryScreen()),
-              );
+              ).then((_) {
+                // Tải lại thống kê khi quay về từ màn hình lịch sử
+                _loadStatistics();
+              });
             }
           },
           selectedItemColor: Colors.blue.shade600,
@@ -1283,9 +1057,7 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: _currentIndex == 0
-                      ? Colors.blue.shade50
-                      : Colors.transparent,
+                  color: _currentIndex == 0 ? Colors.blue.shade50 : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.home),
@@ -1296,9 +1068,7 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: _currentIndex == 1
-                      ? Colors.blue.shade50
-                      : Colors.transparent,
+                  color: _currentIndex == 1 ? Colors.blue.shade50 : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.history_edu_outlined),
@@ -1309,9 +1079,7 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: _currentIndex == 2
-                      ? Colors.blue.shade50
-                      : Colors.transparent,
+                  color: _currentIndex == 2 ? Colors.blue.shade50 : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.notifications),

@@ -46,6 +46,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       // ⭐ Đồng bộ từ Firestore xuống local
       await _firebaseService.syncFromFirebaseToLocal();
       await _loadLocalSchedules();
+      // ⭐ Tải trạng thái đã lưu từ Firebase
+      await _loadStatusesFromFirebase();
     } catch (e) {
       debugPrint('⚠️ Lỗi đồng bộ dữ liệu: $e');
     } finally {
@@ -62,33 +64,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _filterByDate();
   }
 
+  /// 📥 Tải trạng thái uống thuốc từ Firebase
+  Future<void> _loadStatusesFromFirebase() async {
+    try {
+      final statuses = await _firebaseService.getAllReminderStatuses();
+      setState(() {
+        _statuses.clear();
+        for (var entry in statuses.entries) {
+          // Chuyển đổi string sang enum
+          if (entry.value == 'completed') {
+            _statuses[entry.key] = ReminderStatus.completed;
+          } else if (entry.value == 'skipped') {
+            _statuses[entry.key] = ReminderStatus.skipped;
+          } else {
+            _statuses[entry.key] = ReminderStatus.pending;
+          }
+        }
+      });
+      debugPrint('✅ Đã tải ${_statuses.length} trạng thái từ Firebase');
+    } catch (e) {
+      debugPrint('⚠️ Lỗi khi tải trạng thái: $e');
+    }
+  }
+
   /// 📅 Lọc lịch uống thuốc theo ngày đang chọn
   void _filterByDate() {
-    final selectedDay = DateTime(
+    final start = DateTime(
       _selectedDate.year,
       _selectedDate.month,
       _selectedDate.day,
     );
+    final end = start.add(const Duration(days: 1));
 
     setState(() {
       _filteredSchedules = _allSchedules.where((item) {
-        final scheduleTime = item['time'] as DateTime;
-        final scheduleDay = DateTime(
-          scheduleTime.year,
-          scheduleTime.month,
-          scheduleTime.day,
-        );
-
-        // Chỉ hiện thuốc khi ngày được chọn trùng với ngày trong lịch
-        return scheduleDay.isAtSameMomentAs(selectedDay);
+        final t = item['time'] as DateTime;
+        return t.isAfter(start.subtract(const Duration(seconds: 1))) &&
+            t.isBefore(end);
       }).toList();
-
-      // Sắp xếp theo thời gian
-      _filteredSchedules.sort((a, b) {
-        final timeA = a['time'] as DateTime;
-        final timeB = b['time'] as DateTime;
-        return timeA.compareTo(timeB);
-      });
     });
   }
 
@@ -162,26 +175,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _handleSkip(String id, String title) async {
     await _updateStatus(id, ReminderStatus.skipped);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('⏭️ Đã bỏ qua: $title'),
-        backgroundColor: Colors.orange.shade700,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⏭️ Đã bỏ qua: $title'),
+          backgroundColor: Colors.orange.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   Future<void> _handleFinish(String id, String title) async {
     await _updateStatus(id, ReminderStatus.completed);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('💊 Đã uống: $title'),
-        backgroundColor: Colors.green.shade600,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('💊 Đã uống: $title'),
+          backgroundColor: Colors.green.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   /// 🛠️ Chuyển sang màn hình Chỉnh sửa
@@ -241,7 +258,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   Icons.delete_forever,
                   color: Colors.redAccent,
                 ),
-                title: const Text('Xóa lịch trình'),
+                title: const Text('Xóa toàn bộ thuốc này'),
                 onTap: () async {
                   await ReminderStorage.deleteAllByTitle(item['title']);
                   await _firebaseService.deleteAllRemindersByTitle(
@@ -387,20 +404,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               }
                             },
                             itemBuilder: (context) => [
-                              // const PopupMenuItem(
-                              //   value: 'edit',
-                              //   child: Row(
-                              //     children: [
-                              //       Icon(
-                              //         Icons.edit_outlined,
-                              //         size: 20,
-                              //         color: Colors.blue,
-                              //       ),
-                              //       SizedBox(width: 10),
-                              //       Text('Chỉnh sửa'),
-                              //     ],
-                              //   ),
-                              // ),
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.edit_outlined,
+                                      size: 20,
+                                      color: Colors.blue,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text('Chỉnh sửa'),
+                                  ],
+                                ),
+                              ),
                               const PopupMenuItem(
                                 value: 'delete',
                                 child: Row(

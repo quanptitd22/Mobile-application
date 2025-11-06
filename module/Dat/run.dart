@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Medication Reminder',
-      initialRoute: '/home',
+      initialRoute: '/welcome',
       routes: {
         '/welcome': (context) => const WelcomeScreen(),
         '/login': (context) => const LoginScreen(),
