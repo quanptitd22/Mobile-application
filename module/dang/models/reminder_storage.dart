@@ -63,7 +63,7 @@ class Reminder {
         return ["08:00"];
       }
     }
-<<<<<<< HEAD
+
     // Lấy danh sách giờ uống trong ngày
     List<String> parsedTimes = [];
     if (json['timesPerDay'] != null &&
@@ -77,7 +77,7 @@ class Reminder {
     } else {
       parsedTimes = ["08:00"];
     }
-=======
+
 
     final parsedTime = json['time'] is Timestamp
         ? (json['time'] as Timestamp).toDate()
@@ -85,7 +85,7 @@ class Reminder {
               ? DateTime.tryParse(json['time'].toString()) ?? DateTime.now()
               : DateTime.now());
 
->>>>>>> 7d3afe95f83e04a709dcfad0a88ab667049c8d56
+
     return Reminder(
       drawer: json['drawer'] is int ? json['drawer'] : 1,
       id: json['id']?.toString() ?? '',
@@ -102,11 +102,10 @@ class Reminder {
       endDate: json['endDate'] != null && json['endDate'].toString().isNotEmpty
           ? DateTime.tryParse(json['endDate'].toString())
           : null,
-<<<<<<< HEAD
+
       timesPerDay: parsedTimes,
-=======
+
       timesPerDay: parseTimes(json['timesPerDay'], parsedTime),
->>>>>>> 7d3afe95f83e04a709dcfad0a88ab667049c8d56
     );
   }
 

@@ -282,15 +282,11 @@ class FirebaseReminderService {
           'frequency': data['frequency'] ?? 'Hằng ngày',
           'intervalDays': data['intervalDays'] ?? 1,
           'endDate': data['endDate'] ?? '',
-<<<<<<< HEAD
           'timesPerDay': List<String>.from(data['timesPerDay'] ?? []),
-=======
           'timesPerDay': data['timesPerDay'] ?? ['08:00'],
           'drawer': data['drawer'] ?? 1,
->>>>>>> 7d3afe95f83e04a709dcfad0a88ab667049c8d56
         });
       }
-
       print('✅ Đồng bộ Firestore → RTDB thành công cho user ${user.uid}');
     } catch (e) {
       print('❌ Lỗi khi đồng bộ Firestore sang RTDB: $e');
