@@ -1,28 +1,20 @@
 import 'package:firebase_database/firebase_database.dart';
 
-class FirebaseIoTService {
-  final DatabaseReference _db = FirebaseDatabase.instance.ref('devices');
+class FirebaseIotService {
+  final DatabaseReference _ref =
+  FirebaseDatabase.instance.ref().child('medicineBox');
 
-  /// Gửi lệnh đến thiết bị (ví dụ bật đèn hoặc mở ngăn thuốc)
-  Future<void> sendCommand(String deviceId, Map<String, dynamic> command) async {
-    try {
-      await _db.child(deviceId).child('command').set(command);
-      print("📡 Gửi lệnh đến IoT: $command");
-    } catch (e) {
-      print("❌ Lỗi khi gửi lệnh IoT: $e");
-    }
-  }
-
-  /// Cập nhật trạng thái (ví dụ user đã uống thuốc)
-  Future<void> updateStatus(String deviceId, String status) async {
-    await _db.child(deviceId).child('status').set(status);
-  }
-
-  /// Lắng nghe dữ liệu cảm biến từ thiết bị
-  Stream<Map<String, dynamic>> listenSensorData(String deviceId) {
-    return _db.child(deviceId).child('sensor_data').onValue.map((event) {
+  // Stream theo dõi trạng thái 3 ngăn thuốc
+  Stream<Map<String, dynamic>> getMedicineBoxStatus() {
+    return _ref.onValue.map((event) {
       final data = event.snapshot.value as Map?;
-      return data != null ? Map<String, dynamic>.from(data) : {};
+      if (data == null) return {};
+      return data.map((key, value) => MapEntry(key, value.toString()));
     });
+  }
+
+  // Gửi lệnh điều khiển mở/đóng ngăn thuốc
+  Future<void> setCompartmentState(String compartment, String state) async {
+    await _ref.child(compartment).set(state);
   }
 }

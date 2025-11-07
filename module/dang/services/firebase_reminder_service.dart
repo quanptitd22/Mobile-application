@@ -18,6 +18,13 @@ class FirebaseReminderService {
     return _firestore.collection('users').doc(user.uid).collection('reminders');
   }
 
+  /// 🔐 Lấy collection statuses của user hiện tại
+  CollectionReference<Map<String, dynamic>> get _statusCollection {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception("⚠️ Người dùng chưa đăng nhập");
+    return _firestore.collection('users').doc(user.uid).collection('statuses');
+  }
+
   /// ✅ Thêm thuốc mới
   Future<void> addReminder(Reminder reminder) async {
     try {
@@ -68,9 +75,44 @@ class FirebaseReminderService {
   Future<List<Reminder>> getAllReminders() async {
     try {
       final snapshot = await _reminderCollection.get();
-      final reminders = snapshot.docs
-          .map((doc) => Reminder.fromJson(doc.data()))
-          .toList();
+      final reminders = snapshot.docs.map((doc) {
+        final data = doc.data();
+
+        // ép timesPerDay luôn đúng kiểu List<String>
+        List<String> parseTimes(dynamic value) {
+          if (value == null) return [];
+          if (value is List) return value.map((e) => e.toString()).toList();
+          if (value is String && value.contains(',')) {
+            return value.split(',').map((e) => e.trim()).toList();
+          }
+          if (value is String && value.isNotEmpty) {
+            return [value.trim()];
+          }
+          return [];
+        }
+
+        // ép kiểu đúng và truyền thủ công để tránh parse sai
+        return Reminder(
+          id: data['id']?.toString() ?? doc.id,
+          title: data['title']?.toString() ?? 'Không tên',
+          description: data['description']?.toString() ?? '',
+          dosage: (data['dosage'] is int)
+              ? data['dosage']
+              : int.tryParse(data['dosage']?.toString() ?? '1') ?? 1,
+          time: (data['time'] is Timestamp)
+              ? data['time'].toDate()
+              : DateTime.tryParse(data['time']?.toString() ?? '') ?? DateTime.now(),
+          frequency: data['frequency']?.toString() ?? "Hằng ngày",
+          intervalDays: (data['intervalDays'] is int)
+              ? data['intervalDays']
+              : int.tryParse(data['intervalDays']?.toString() ?? '1') ?? 1,
+          endDate: data['endDate'] != null && data['endDate'].toString().isNotEmpty
+              ? DateTime.tryParse(data['endDate'].toString())
+              : null,
+          timesPerDay: parseTimes(data['timesPerDay']),
+          drawer: data['drawer'] is int ? data['drawer'] : 1,
+        );
+      }).toList();
 
       print("📥 Đã tải ${reminders.length} thuốc từ Firestore (theo user)");
       return reminders;
@@ -118,11 +160,80 @@ class FirebaseReminderService {
   /// 🟢 Cập nhật trạng thái thuốc
   Future<void> updateReminderStatus(String id, String status) async {
     try {
-      await _reminderCollection.doc(id).update({'status': status});
-      await syncFromFirebaseToRTDB();
+      await _statusCollection.doc(id).set({
+        'status': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
       print("✅ Cập nhật trạng thái thuốc $id -> $status (user hiện tại)");
     } catch (e) {
       print("❌ Lỗi khi cập nhật trạng thái: $e");
+    }
+  }
+
+  /// 📥 Lấy tất cả trạng thái thuốc đã lưu
+  Future<Map<String, String>> getAllReminderStatuses() async {
+    try {
+      final snapshot = await _statusCollection.get();
+      final Map<String, String> statuses = {};
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        statuses[doc.id] = data['status']?.toString() ?? 'pending';
+      }
+      
+      print("📥 Đã tải ${statuses.length} trạng thái từ Firebase");
+      return statuses;
+    } catch (e) {
+      print("❌ Lỗi khi tải trạng thái: $e");
+      return {};
+    }
+  }
+
+  /// 📊 Thống kê số lượng theo trạng thái
+  Future<Map<String, int>> getStatusStatistics() async {
+    try {
+      final snapshot = await _statusCollection.get();
+      
+      int completed = 0;
+      int skipped = 0;
+      int pending = 0;
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final status = data['status']?.toString() ?? 'pending';
+        
+        if (status == 'completed') {
+          completed++;
+        } else if (status == 'skipped') {
+          skipped++;
+        } else {
+          pending++;
+        }
+      }
+      
+      // Tính tổng số lịch trình (từ reminders)
+      final allSchedules = await ReminderStorage.getAllSchedules();
+      final totalSchedules = allSchedules.length;
+      
+      // Số lịch chờ = tổng - đã uống - đã bỏ qua
+      final actualPending = totalSchedules - completed - skipped;
+      
+      print("📊 Thống kê: Đã uống: $completed, Đã bỏ qua: $skipped, Sắp tới: $actualPending");
+      
+      return {
+        'completed': completed,
+        'skipped': skipped,
+        'pending': actualPending > 0 ? actualPending : pending,
+        'total': totalSchedules,
+      };
+    } catch (e) {
+      print("❌ Lỗi khi thống kê: $e");
+      return {
+        'completed': 0,
+        'skipped': 0,
+        'pending': 0,
+        'total': 0,
+      };
     }
   }
 
@@ -171,7 +282,12 @@ class FirebaseReminderService {
           'frequency': data['frequency'] ?? 'Hằng ngày',
           'intervalDays': data['intervalDays'] ?? 1,
           'endDate': data['endDate'] ?? '',
+<<<<<<< HEAD
           'timesPerDay': List<String>.from(data['timesPerDay'] ?? []),
+=======
+          'timesPerDay': data['timesPerDay'] ?? ['08:00'],
+          'drawer': data['drawer'] ?? 1,
+>>>>>>> 7d3afe95f83e04a709dcfad0a88ab667049c8d56
         });
       }
 

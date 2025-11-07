@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/firebase_reminder_service.dart';
+import '../services/notification_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -27,7 +28,7 @@ class Reminder {
     this.frequency = "Hằng ngày",
     this.intervalDays = 1,
     this.endDate,
-    this.timesPerDay = const ["08:00"], // mặc định 1 lần/ngày\
+    this.timesPerDay = const ["08:00"],
     this.drawer,
   });
 
@@ -49,12 +50,20 @@ class Reminder {
 
   /// 🔹 Parse từ JSON ra object
   factory Reminder.fromJson(Map<String, dynamic> json) {
-    // Hàm phụ để chuyển DateTime -> "HH:mm"
-    String formatTime(DateTime time) {
-      final hour = time.hour.toString().padLeft(2, '0');
-      final minute = time.minute.toString().padLeft(2, '0');
-      return '$hour:$minute';
+    List<String> parseTimes(dynamic value, DateTime time) {
+      if (value == null) {
+        return [
+          "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}",
+        ];
+      } else if (value is List) {
+        return value.map((e) => e.toString()).toList();
+      } else if (value is String) {
+        return value.split(',').map((e) => e.trim()).toList();
+      } else {
+        return ["08:00"];
+      }
     }
+<<<<<<< HEAD
     // Lấy danh sách giờ uống trong ngày
     List<String> parsedTimes = [];
     if (json['timesPerDay'] != null &&
@@ -68,6 +77,15 @@ class Reminder {
     } else {
       parsedTimes = ["08:00"];
     }
+=======
+
+    final parsedTime = json['time'] is Timestamp
+        ? (json['time'] as Timestamp).toDate()
+        : (json['time'] != null && json['time'].toString().isNotEmpty
+              ? DateTime.tryParse(json['time'].toString()) ?? DateTime.now()
+              : DateTime.now());
+
+>>>>>>> 7d3afe95f83e04a709dcfad0a88ab667049c8d56
     return Reminder(
       drawer: json['drawer'] is int ? json['drawer'] : 1,
       id: json['id']?.toString() ?? '',
@@ -76,11 +94,7 @@ class Reminder {
       dosage: (json['dosage'] is int)
           ? json['dosage']
           : int.tryParse(json['dosage']?.toString() ?? '1') ?? 1,
-      time: json['time'] is Timestamp
-          ? (json['time'] as Timestamp).toDate()
-          : (json['time'] != null && json['time'].toString().isNotEmpty
-          ? DateTime.tryParse(json['time'].toString()) ?? DateTime.now()
-          : DateTime.now()),
+      time: parsedTime,
       frequency: json['frequency']?.toString() ?? "Hằng ngày",
       intervalDays: (json['intervalDays'] is int)
           ? json['intervalDays']
@@ -88,10 +102,18 @@ class Reminder {
       endDate: json['endDate'] != null && json['endDate'].toString().isNotEmpty
           ? DateTime.tryParse(json['endDate'].toString())
           : null,
+<<<<<<< HEAD
       timesPerDay: parsedTimes,
+=======
+      timesPerDay: parseTimes(json['timesPerDay'], parsedTime),
+>>>>>>> 7d3afe95f83e04a709dcfad0a88ab667049c8d56
     );
   }
 
+  /// 🔹 Chuyển Map (Firebase snapshot) thành Reminder object
+  factory Reminder.fromMap(Map<String, dynamic> map) {
+    return Reminder.fromJson(map);
+  }
 
   /// 🔹 Sinh danh sách các thời điểm uống thuốc (theo logic thời gian)
   List<DateTime> generateSchedule() {
@@ -99,19 +121,24 @@ class Reminder {
     DateTime current = DateTime(time.year, time.month, time.day);
     DateTime end = endDate ?? current.add(const Duration(days: 30));
 
-    while (current.isBefore(end) || current.isAtSameMomentAs(end)) {
+    for (
+      DateTime d = current;
+      !d.isAfter(end);
+      d = d.add(Duration(days: intervalDays))
+    ) {
       for (var t in timesPerDay) {
+        if (t.isEmpty) continue;
         final parts = t.split(':');
         if (parts.length == 2) {
           final hour = int.tryParse(parts[0]) ?? 0;
           final minute = int.tryParse(parts[1]) ?? 0;
-          schedule.add(DateTime(current.year, current.month, current.day, hour, minute));
+          schedule.add(DateTime(d.year, d.month, d.day, hour, minute));
         }
       }
-      current = current.add(Duration(days: intervalDays));
     }
 
-    return schedule;
+    final unique = schedule.toSet().toList()..sort((a, b) => a.compareTo(b));
+    return unique;
   }
 }
 
@@ -143,16 +170,18 @@ class ReminderStorage {
     reminders.add(reminder);
     await _saveReminders(reminders);
 
-    // 🔒 Chỉ đồng bộ nếu đã đăng nhập
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       print("⚠️ Không thể đồng bộ Firebase vì chưa đăng nhập");
       return;
     }
 
-    // Đồng bộ Firebase
     final firebaseService = FirebaseReminderService();
     await firebaseService.addReminder(reminder);
+
+    // ✅ Đặt thông báo cho reminder mới
+    await NotificationService().scheduleReminder(reminder);
+    print("🔔 Đã đặt thông báo cho: ${reminder.title}");
   }
 
   /// 🔸 Cập nhật reminder
@@ -171,6 +200,10 @@ class ReminderStorage {
 
       final firebaseService = FirebaseReminderService();
       await firebaseService.updateReminder(updatedReminder);
+
+      // ✅ Cập nhật thông báo
+      await NotificationService().scheduleReminder(updatedReminder);
+      print("🔔 Đã cập nhật thông báo cho: ${updatedReminder.title}");
     }
   }
 
@@ -188,18 +221,24 @@ class ReminderStorage {
 
     final firebaseService = FirebaseReminderService();
     await firebaseService.deleteReminder(id);
+
+    // ✅ Hủy thông báo
+    await NotificationService().cancelReminderNotifications(id);
+    print("🔕 Đã hủy thông báo cho reminder: $id");
   }
 
-  /// 🔸 Xoá nhiều reminders
-  static Future<void> deleteReminders(List<String> ids) async {
+  static Future<void> rescheduleAllNotifications() async {
     final reminders = await loadReminders();
-    reminders.removeWhere((r) => ids.contains(r.id));
-    await _saveReminders(reminders);
 
-    final firebaseService = FirebaseReminderService();
-    for (var id in ids) {
-      await firebaseService.deleteReminder(id);
+    // Hủy tất cả thông báo cũ
+    await NotificationService().cancelAllNotifications();
+
+    // Đặt lại thông báo cho tất cả reminders
+    for (var reminder in reminders) {
+      await NotificationService().scheduleReminder(reminder);
     }
+
+    print("🔄 Đã đặt lại ${reminders.length} thông báo");
   }
 
   /// 🔸 Lưu toàn bộ reminders xuống SharedPreferences
@@ -215,88 +254,38 @@ class ReminderStorage {
     List<Map<String, dynamic>> schedules = [];
 
     for (var reminder in reminders) {
+      // Sử dụng ngày bắt đầu từ reminder
+      final startDate = reminder.time;
       final schedule = reminder.generateSchedule();
+
       for (var time in schedule) {
+        // Tạo DateTime với ngày từ lịch và giờ từ time
+        final scheduleDateTime = DateTime(
+          time.year,
+          time.month,
+          time.day,
+          time.hour,
+          time.minute,
+        );
+
         schedules.add({
-          'id': "${reminder.id}_${time.toIso8601String()}",
+          'id': "${reminder.id}_${scheduleDateTime.toIso8601String()}",
           'title': reminder.title,
           'description': reminder.description,
           'dosage': reminder.dosage,
-          'time': time,
+          'time': scheduleDateTime,
           'drawer': reminder.drawer,
-
-          'reminderId': reminder.id, // <-- Dòng này đã có, rất tốt!
+          'reminderId': reminder.id,
+          'frequency': reminder.frequency,
+          'startDate': startDate,
         });
       }
     }
 
-    // Sắp xếp theo thời gian
-    schedules.sort((a, b) => (a['time'] as DateTime).compareTo(b['time'] as DateTime));
-    return schedules;
-  }
-
-  // ================== BẮT ĐẦU CODE MỚI ==================
-  /// 🔸 Lấy một Reminder cụ thể bằng ID (Dùng cho tính năng Chỉnh sửa)
-  static Future<Reminder?> getReminderById(String id) async {
-    final reminders = await loadReminders();
-    try {
-      // Dùng firstWhere để tìm
-      return reminders.firstWhere((r) => r.id == id);
-    } catch (e) {
-      // firstWhere ném lỗi nếu không tìm thấy
-      print("ℹ️ Không tìm thấy reminder với ID: $id");
-      return null;
-    }
-  }
-  // ================== KẾT THÚC CODE MỚI ==================
-
-
-  // 🟡 THÊM MỚI: Xoá một lần thuốc cụ thể
-  static Future<void> deleteScheduleOnce(Map<String, dynamic> schedule) async {
-    final reminders = await loadReminders();
-
-    // Tìm thuốc chứa lịch này
-    final target = reminders.firstWhere(
-          (r) => r.title == schedule['title'],
-      orElse: () => Reminder(
-        id: '',
-        title: '',
-        description: '',
-        dosage: 0,
-        time: DateTime.now(),
-      ),
+    schedules.sort(
+      (a, b) => (a['time'] as DateTime).compareTo(b['time'] as DateTime),
     );
-
-    if (target.id.isEmpty) return; // Không tìm thấy thuốc
-
-    // Xóa lịch cụ thể khỏi timesPerDay nếu có
-    final time = schedule['time'] as DateTime;
-    final timeStr =
-        "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
-    target.timesPerDay.remove(timeStr);
-
-    // Nếu thuốc không còn lần nào => xoá luôn
-    if (target.timesPerDay.isEmpty) {
-      reminders.removeWhere((r) => r.id == target.id);
-      final firebaseService = FirebaseReminderService();
-      await firebaseService.deleteReminder(target.id);
-    }
-
-    await _saveReminders(reminders);
-  }
-
-  // 🔴 THÊM MỚI: Xoá toàn bộ lịch theo tên thuốc
-  static Future<void> deleteAllByTitle(String title) async {
-    final reminders = await loadReminders();
-    final toDelete = reminders.where((r) => r.title == title).toList();
-
-    for (var r in toDelete) {
-      final firebaseService = FirebaseReminderService();
-      await firebaseService.deleteReminder(r.id);
-    }
-
-    reminders.removeWhere((r) => r.title == title);
-    await _saveReminders(reminders);
+    return schedules;
   }
 
   static Future<void> saveAllReminders(List<Reminder> reminders) async {
@@ -305,7 +294,6 @@ class ReminderStorage {
     await prefs.setString(_key, jsonString);
   }
 
-  /// 🔄 Đồng bộ từ Firebase → SharedPreferences
   static Future<void> syncFromFirebaseToLocal() async {
     try {
       final firebaseService = FirebaseReminderService();
@@ -313,7 +301,9 @@ class ReminderStorage {
 
       if (firebaseReminders.isNotEmpty) {
         await saveAllReminders(firebaseReminders);
-        print("✅ Đã đồng bộ ${firebaseReminders.length} reminders từ Firebase xuống local.");
+        print(
+          "✅ Đã đồng bộ ${firebaseReminders.length} reminders từ Firebase xuống local.",
+        );
       } else {
         print("ℹ️ Không có dữ liệu trên Firebase.");
       }
@@ -321,7 +311,7 @@ class ReminderStorage {
       print("❌ Lỗi khi đồng bộ từ Firebase: $e");
     }
   }
-  // Hàm này đồng bộ local → RTDB theo user để thiết bị IoT đọc được
+
   static Future<void> syncLocalToRTDB() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -332,7 +322,7 @@ class ReminderStorage {
     final reminders = await loadReminders();
     final ref = FirebaseDatabase.instance.ref('users/${user.uid}/reminders');
 
-    await ref.remove(); // Xóa cũ để tránh trùng
+    await ref.remove();
     for (var r in reminders) {
       await ref.child(r.id).set(r.toJson());
     }
@@ -340,4 +330,54 @@ class ReminderStorage {
     print("✅ Đã đồng bộ local → RTDB cho user ${user.uid}");
   }
 
+  /// 🔸 Lấy nhắc nhở theo ID (trả về Reminder)
+  static Future<Reminder?> getReminderById(String id) async {
+    try {
+      final snapshot = await FirebaseDatabase.instance
+          .ref('reminders')
+          .child(id)
+          .get();
+
+      if (snapshot.exists) {
+        final data = Map<String, dynamic>.from(snapshot.value as Map);
+        return Reminder.fromMap(data);
+      } else {
+        return null;
+      }
+    } catch (e) {
+      print('Error getting reminder by ID: $e');
+      return null;
+    }
+  }
+
+  /// 🔸 Xóa tất cả nhắc nhở theo tiêu đề
+  static Future<void> deleteAllByTitle(String title) async {
+    try {
+      final snapshot = await FirebaseDatabase.instance.ref('reminders').get();
+      if (snapshot.exists) {
+        final data = snapshot.value as Map;
+        data.forEach((key, value) async {
+          final item = Map<String, dynamic>.from(value);
+          if (item['title'] == title) {
+            await FirebaseDatabase.instance
+                .ref('reminders')
+                .child(key)
+                .remove();
+          }
+        });
+      }
+    } catch (e) {
+      print('Error deleting reminders by title: $e');
+    }
+  }
+
+  /// Generate a stable notification id for a reminder occurrence
+  static int _notificationIdFor(String reminderId, DateTime time) {
+    // Ensure a positive 32-bit int
+    return (reminderId.hashCode ^ time.millisecondsSinceEpoch) & 0x7fffffff;
+  }
+
+  /// Public wrapper to get a notification id for external callers
+  static int notificationIdFor(String reminderId, DateTime time) =>
+      _notificationIdFor(reminderId, time);
 }
