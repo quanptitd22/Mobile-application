@@ -29,7 +29,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
   ];
   int _intervalDays = 2;
   DateTime _startDate = DateTime.now();
-  int _durationDays = 30;
+  int _durationDays = 7;
   int _customIntervalDays = 1;
   final _customDaysController = TextEditingController();
 

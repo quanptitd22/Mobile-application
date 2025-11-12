@@ -41,11 +41,39 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 📊 Tải thống kê từ Firebase
   Future<void> _loadStatistics() async {
     try {
-      final stats = await _firebaseService.getStatusStatistics();
+      // Lấy tất cả lịch trình từ lịch sử
+      final allSchedules = await ReminderStorage.getAllSchedules();
+      
+      // Lấy trạng thái từ Firebase
+      final statuses = await _firebaseService.getAllReminderStatuses();
+      
+      int completed = 0;
+      int skipped = 0;
+      int pending = 0;
+      
+      // Đếm số lượng theo trạng thái của từng lịch trình trong lịch sử hiện tại
+      for (var schedule in allSchedules) {
+        final time = schedule['time'] as DateTime;
+        final id = '${schedule['title']}_${time.toIso8601String()}';
+        final status = statuses[id] ?? 'pending';
+        
+        if (status == 'completed') {
+          completed++;
+        } else if (status == 'skipped') {
+          skipped++;
+        } else {
+          pending++;
+        }
+      }
       setState(() {
-        _statistics = stats;
+        _statistics = {
+          'completed': completed,
+          'skipped': skipped,
+          'pending': pending,
+          'total': allSchedules.length,
+        };
       });
-      print("📊 Đã tải thống kê: $_statistics");
+      print("📊 Thống kê hiện tại: Đã uống: $completed, Đã bỏ lỡ: $skipped, Sắp tới: $pending, Tổng: ${allSchedules.length}");
     } catch (e) {
       print("❌ Lỗi khi tải thống kê: $e");
     }
@@ -127,6 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // 3️⃣ Cập nhật giao diện
         await _loadReminders();
+        await _loadStatistics(); // Tải lại thống kê sau khi thêm
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -173,6 +202,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // 3️⃣ Cập nhật giao diện
       await _loadReminders();
+      await _loadStatistics();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -548,9 +578,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // Stats cards với dữ liệu thực
   Widget _buildStatsCards() {
     // Tính phần trăm đã bỏ lỡ
-    final total = _statistics['total'] ?? 1;
+    final completed = _statistics['completed'] ?? 0;
     final skipped = _statistics['skipped'] ?? 0;
-    final skippedPercent = total > 0 ? ((skipped / total) * 100).round() : 0;
+    final pending = _statistics['pending'] ?? 0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -558,7 +588,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Expanded(
             child: _buildStatCard(
-              '${_statistics['completed'] ?? 0}/${total}',
+               '$completed',
               'Đã uống',
               Icons.check_circle,
               Colors.green,
@@ -567,7 +597,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: _buildStatCard(
-              '$skippedPercent%',
+              '$skipped',
               'Đã bỏ lỡ',
               Icons.cancel_outlined,
               Colors.red,
@@ -576,7 +606,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: _buildStatCard(
-              '${_statistics['pending'] ?? 0}',
+               '$pending',
               'Sắp tới',
               Icons.access_time,
               Colors.blue,
@@ -1043,6 +1073,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Tải lại thống kê khi quay về từ màn hình lịch sử
                 _loadStatistics();
               });
+              } else if (index == 2) {
+              // Chuyển sang DrawerStatusScreen khi nhấn vào "Trạng thái hộp thuốc"
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const DrawerStatusScreen()),
+              );
             }
           },
           selectedItemColor: Colors.blue.shade600,
@@ -1082,9 +1118,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: _currentIndex == 2 ? Colors.blue.shade50 : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.notifications),
+                  child: const Icon(Icons.inventory_2_outlined),
               ),
-              label: 'Thông báo',
+               label: 'Trạng thái hộp thuốc',
             ),
           ],
         ),

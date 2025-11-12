@@ -63,6 +63,8 @@ class Reminder {
         return ["08:00"];
       }
     }
+    
+    
 
     final parsedTime = json['time'] is Timestamp
         ? (json['time'] as Timestamp).toDate()
