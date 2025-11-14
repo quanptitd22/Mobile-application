@@ -190,52 +190,52 @@ class FirebaseReminderService {
   }
 
   /// 📊 Thống kê số lượng theo trạng thái
-  Future<Map<String, int>> getStatusStatistics() async {
-    try {
-      final snapshot = await _statusCollection.get();
+   //Future<Map<String, int>> getStatusStatistics() async {
+  //   try {
+  //     final snapshot = await _statusCollection.get();
       
-      int completed = 0;
-      int skipped = 0;
-      int pending = 0;
+      // int completed = 0;
+      // int skipped = 0;
+      // int pending = 0;
       
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final status = data['status']?.toString() ?? 'pending';
+      // for (var doc in snapshot.docs) {
+      //   final data = doc.data();
+      //   final status = data['status']?.toString() ?? 'pending';
         
-        if (status == 'completed') {
-          completed++;
-        } else if (status == 'skipped') {
-          skipped++;
-        } else {
-          pending++;
-        }
-      }
+      //   if (status == 'completed') {
+      //     completed++;
+      //   } else if (status == 'skipped') {
+      //     skipped++;
+      //   } else {
+      //     pending++;
+      //   }
+      // }
       
       // Tính tổng số lịch trình (từ reminders)
-      final allSchedules = await ReminderStorage.getAllSchedules();
-      final totalSchedules = allSchedules.length;
+      // final allSchedules = await ReminderStorage.getAllSchedules();
+      // final totalSchedules = allSchedules.length;
       
       // Số lịch chờ = tổng - đã uống - đã bỏ qua
-      final actualPending = totalSchedules - completed - skipped;
+      // final actualPending = totalSchedules - completed - skipped;
       
-      print("📊 Thống kê: Đã uống: $completed, Đã bỏ qua: $skipped, Sắp tới: $actualPending");
+      // print("📊 Thống kê: Đã uống: $completed, Đã bỏ qua: $skipped, Sắp tới: $actualPending");
       
-      return {
-        'completed': completed,
-        'skipped': skipped,
-        'pending': actualPending > 0 ? actualPending : pending,
-        'total': totalSchedules,
-      };
-    } catch (e) {
-      print("❌ Lỗi khi thống kê: $e");
-      return {
-        'completed': 0,
-        'skipped': 0,
-        'pending': 0,
-        'total': 0,
-      };
-    }
-  }
+  //     return {
+  //       'completed': completed,
+  //       'skipped': skipped,
+  //       'pending': actualPending > 0 ? actualPending : pending,
+  //       'total': totalSchedules,
+  //     };
+  //   } catch (e) {
+  //     print("❌ Lỗi khi thống kê: $e");
+  //     return {
+  //       'completed': 0,
+  //       'skipped': 0,
+  //       'pending': 0,
+  //       'total': 0,
+  //     };
+  //   }
+  // }
 
   /// 🗑️ Xóa toàn bộ reminders có cùng tiêu đề
   Future<void> deleteAllRemindersByTitle(String title) async {

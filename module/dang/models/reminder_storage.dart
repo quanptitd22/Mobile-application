@@ -63,6 +63,8 @@ class Reminder {
         return ["08:00"];
       }
     }
+    
+    
 
     // Lấy danh sách giờ uống trong ngày
     List<String> parsedTimes = [];

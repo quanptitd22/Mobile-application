@@ -161,6 +161,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  bool _isScheduleInPast(DateTime scheduleTime) {
+    final now = DateTime.now();
+    // So sánh đầy đủ: năm, tháng, ngày, giờ, phút
+    return scheduleTime.isBefore(now);
+  }
+
   /// ✅ Ghi nhận trạng thái (đã uống / bỏ qua) và đồng bộ Firebase
   Future<void> _updateStatus(String id, ReminderStatus status) async {
     setState(() => _statuses[id] = status);
@@ -299,6 +305,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final id = '${item['title']}_${time.toIso8601String()}';
     final status = _statuses[id] ?? ReminderStatus.pending;
 
+
+// ✅ Kiểm tra xem lịch trình có nằm trong quá khứ không
+    final isInPast = _isScheduleInPast(time);
+
     Color getColor() {
       switch (status) {
         case ReminderStatus.completed:
@@ -382,7 +392,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   ? 'Đã uống'
                                   : status == ReminderStatus.skipped
                                   ? 'Đã bỏ qua'
-                                  : 'Chờ uống',
+                                  : isInPast
+                                  ? 'Chờ uống'
+                                  : 'Sắp tới',
                               style: TextStyle(
                                 color: color,
                                 fontSize: 12,
@@ -485,7 +497,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                   ],
                   const SizedBox(height: 12),
-                  if (status == ReminderStatus.pending)
+                  // ✅ CHỈ HIỂN THỊ NÚT KHI LỊCH TRÌNH NẰM TRONG QUÁ KHỨ VÀ CHƯA ĐƯỢC ĐÁNH DẤU
+                  if (isInPast && status == ReminderStatus.pending)
                     Row(
                       children: [
                         Expanded(
@@ -516,6 +529,41 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ),
                         ),
                       ],
+                      )
+                  // ✅ HIỂN THỊ THÔNG BÁO KHI LỊCH TRÌNH TRONG TƯƠNG LAI
+                  else if (!isInPast)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.blue.shade200,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.access_time,
+                            size: 18,
+                            color: Colors.blue.shade600,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Chưa đến giờ uống thuốc',
+                            style: TextStyle(
+                              color: Colors.blue.shade600,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                 ],
               ),
