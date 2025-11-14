@@ -285,11 +285,11 @@ class _ReminderScreenState extends State<ReminderScreen> {
     switch (_selectedFrequency) {
       case 'Hằng ngày':
         interval = 1;
-        endDate = _startDate.add(Duration(days: _durationDays));
+        endDate = _startDate.add(Duration(days: _durationDays -1 ));
         break;
       case 'Cách ngày':
         interval = 2;
-        endDate = _startDate.add(Duration(days: _durationDays));
+        endDate = _startDate.add(Duration(days: _durationDays -1 ));
         break;
       case 'Một lần':
         interval = 1;
@@ -299,7 +299,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
       case 'Theo số ngày':
         // Lịch uống thuốc sẽ kéo dài từ ngày bắt đầu đến ngày kết thúc (mỗi ngày một lần)
         interval = 1; // Hằng ngày trong khoảng thời gian đã chọn
-        endDate = _startDate.add(Duration(days: _customIntervalDays));
+        endDate = _startDate.add(Duration(days: _customIntervalDays -1 ));
         break;
     }
 
