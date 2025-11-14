@@ -297,8 +297,9 @@ class _ReminderScreenState extends State<ReminderScreen> {
         endDate = DateTime(_startDate.year, _startDate.month, _startDate.day);
         break;
       case 'Theo số ngày':
-        interval = _customIntervalDays;
-        endDate = _startDate.add(Duration(days: _durationDays));
+        // Lịch uống thuốc sẽ kéo dài từ ngày bắt đầu đến ngày kết thúc (mỗi ngày một lần)
+        interval = 1; // Hằng ngày trong khoảng thời gian đã chọn
+        endDate = _startDate.add(Duration(days: _customIntervalDays));
         break;
     }
 
