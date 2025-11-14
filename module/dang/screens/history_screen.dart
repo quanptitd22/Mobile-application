@@ -216,13 +216,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return;
     }
 
-    final reminder = await ReminderStorage.getReminderById(reminderId);
+    // Lấy reminder từ local storage
+    final reminders = await ReminderStorage.loadReminders();
+    final reminder = reminders.firstWhere(
+      (r) => r.id == reminderId,
+      orElse: () => Reminder(
+        id: '',
+        title: '',
+        description: '',
+        dosage: 1,
+        time: DateTime.now(),
+      ),
+    );
 
-    if (reminder == null) {
+    if (reminder.id.isEmpty) {
       _showErrorSnackBar('Lỗi: Không thể tải lịch trình để chỉnh sửa.');
       return;
     }
 
+    // Mở màn hình chỉnh sửa
     final updatedReminder = await Navigator.push<Reminder>(
       context,
       MaterialPageRoute(
@@ -230,14 +242,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
     );
 
+    // Cập nhật reminder sau khi chỉnh sửa
     if (updatedReminder != null) {
       await ReminderStorage.updateReminder(updatedReminder);
-      _syncAndLoad();
+      // Tải lại dữ liệu để hiển thị thay đổi
+      await _syncAndLoad();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Đã cập nhật lịch trình: ${updatedReminder.title}'),
+            backgroundColor: Colors.green.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
     }
   }
 
   /// 🗑️ Xóa lịch thuốc (chỉ 1 lần hoặc toàn bộ)
   Future<void> _deleteSchedule(Map<String, dynamic> item) async {
+    final scheduleTime = item['time'] as DateTime;
+    final reminderId = item['reminderId'] as String?;
+    
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -261,17 +289,65 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
               ListTile(
                 leading: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.orange,
+                ),
+                title: const Text('Xóa lịch trình này'),
+                subtitle: Text(
+                  'Chỉ xóa lịch trình ngày ${DateFormat('dd/MM/yyyy HH:mm').format(scheduleTime)}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+                onTap: () async {
+                  if (reminderId != null) {
+                    await ReminderStorage.deleteScheduleTime(reminderId, scheduleTime);
+                    Navigator.pop(context);
+                    await _syncAndLoad();
+                    
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('✅ Đã xóa lịch trình: ${item['title']}'),
+                          backgroundColor: Colors.green.shade600,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
+                    }
+                  } else {
+                    Navigator.pop(context);
+                    _showErrorSnackBar('Lỗi: Không tìm thấy ID của lịch trình.');
+                  }
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(
                   Icons.delete_forever,
                   color: Colors.redAccent,
                 ),
                 title: const Text('Xóa toàn bộ thuốc này'),
+                subtitle: const Text(
+                  'Xóa tất cả lịch trình của thuốc này',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
                 onTap: () async {
                   await ReminderStorage.deleteAllByTitle(item['title']);
                   await _firebaseService.deleteAllRemindersByTitle(
                     item['title'],
                   );
                   Navigator.pop(context);
-                  _syncAndLoad();
+                  await _syncAndLoad();
+                  
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('✅ Đã xóa toàn bộ lịch trình: ${item['title']}'),
+                        backgroundColor: Colors.green.shade600,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    );
+                  }
                 },
               ),
               const Divider(),

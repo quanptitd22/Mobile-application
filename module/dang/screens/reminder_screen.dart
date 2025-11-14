@@ -40,18 +40,63 @@ class _ReminderScreenState extends State<ReminderScreen> {
     super.initState();
     _customDaysController.text = _customIntervalDays.toString();
     if (widget.existingReminder != null) {
-      _titleController.text = widget.existingReminder!.title;
-      _descriptionController.text = widget.existingReminder!.description ?? '';
-      _times = [widget.existingReminder!.time];
-      _selectedQuantity = widget.existingReminder!.dosage;
+      final reminder = widget.existingReminder!;
+      _titleController.text = reminder.title;
+      _descriptionController.text = reminder.description ?? '';
+      _selectedQuantity = reminder.dosage;
       _selectedUnit = "viên";
-      _selectedFrequency = widget.existingReminder!.frequency ?? 'Hằng ngày';
-      _intervalDays = widget.existingReminder!.intervalDays ?? 2;
-      _durationDays = widget.existingReminder!.endDate != null
-          ? widget.existingReminder!.endDate!.difference(DateTime.now()).inDays
-          : 7;
-      _startDate = widget.existingReminder!.time;
-      _selectedDrawer = widget.existingReminder!.drawer ?? 1;
+      _selectedFrequency = reminder.frequency ?? 'Hằng ngày';
+      _intervalDays = reminder.intervalDays ?? 2;
+      _startDate = DateTime(
+        reminder.time.year,
+        reminder.time.month,
+        reminder.time.day,
+      );
+      _selectedDrawer = reminder.drawer ?? 1;
+      
+      // Load tất cả các giờ uống thuốc từ timesPerDay
+      if (reminder.timesPerDay.isNotEmpty) {
+        _times = reminder.timesPerDay.map((timeStr) {
+          final parts = timeStr.split(':');
+          if (parts.length == 2) {
+            final hour = int.tryParse(parts[0]) ?? 0;
+            final minute = int.tryParse(parts[1]) ?? 0;
+            return DateTime(
+              _startDate.year,
+              _startDate.month,
+              _startDate.day,
+              hour,
+              minute,
+            );
+          }
+          return _startDate;
+        }).toList();
+      } else {
+        _times = [reminder.time];
+      }
+      
+      // Tính durationDays và customIntervalDays
+      if (reminder.endDate != null) {
+        final start = DateTime(
+          reminder.time.year,
+          reminder.time.month,
+          reminder.time.day,
+        );
+        final end = DateTime(
+          reminder.endDate!.year,
+          reminder.endDate!.month,
+          reminder.endDate!.day,
+        );
+        _durationDays = end.difference(start).inDays;
+        
+        // Nếu là "Theo số ngày", set customIntervalDays
+        if (_selectedFrequency == 'Theo số ngày') {
+          _customIntervalDays = _durationDays;
+          _customDaysController.text = _customIntervalDays.toString();
+        }
+      } else {
+        _durationDays = 7;
+      }
     } else {
       _times = [DateTime.now().add(const Duration(hours: 1))];
       _startDate = DateTime.now();
@@ -333,6 +378,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
       endDate: endDate,
       timesPerDay: timesPerDay,
       drawer: _selectedDrawer,
+      deletedTimes: widget.existingReminder?.deletedTimes ?? [],
     );
 
     Navigator.pop(context, reminder);

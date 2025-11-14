@@ -91,6 +91,13 @@ class FirebaseReminderService {
           return [];
         }
 
+        // Parse deletedTimes
+        List<String> parseDeletedTimes(dynamic value) {
+          if (value == null) return [];
+          if (value is List) return value.map((e) => e.toString()).toList();
+          return [];
+        }
+
         // ép kiểu đúng và truyền thủ công để tránh parse sai
         return Reminder(
           id: data['id']?.toString() ?? doc.id,
@@ -111,6 +118,7 @@ class FirebaseReminderService {
               : null,
           timesPerDay: parseTimes(data['timesPerDay']),
           drawer: data['drawer'] is int ? data['drawer'] : 1,
+          deletedTimes: parseDeletedTimes(data['deletedTimes']),
         );
       }).toList();
 

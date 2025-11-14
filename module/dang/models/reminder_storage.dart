@@ -18,6 +18,7 @@ class Reminder {
   int intervalDays; // số ngày cách quãng
   DateTime? endDate; // ngày kết thúc (có thể null)
   List<String> timesPerDay; // danh sách giờ uống trong ngày ["08:00", "20:00"]
+  List<String> deletedTimes; // danh sách các thời điểm đã bị xóa (ISO8601 strings)
 
   Reminder({
     required this.id,
@@ -30,6 +31,7 @@ class Reminder {
     this.endDate,
     this.timesPerDay = const ["08:00"],
     this.drawer,
+    this.deletedTimes = const [],
   });
 
   /// 🔹 Chuyển sang JSON để lưu
@@ -45,6 +47,7 @@ class Reminder {
       'endDate': endDate?.toIso8601String(),
       'timesPerDay': timesPerDay,
       'drawer': drawer,
+      'deletedTimes': deletedTimes,
     };
   }
 
@@ -72,6 +75,15 @@ class Reminder {
               ? DateTime.tryParse(json['time'].toString()) ?? DateTime.now()
               : DateTime.now());
 
+    // Parse deletedTimes
+    List<String> parseDeletedTimes(dynamic value) {
+      if (value == null) return [];
+      if (value is List) {
+        return value.map((e) => e.toString()).toList();
+      }
+      return [];
+    }
+
     return Reminder(
       drawer: json['drawer'] is int ? json['drawer'] : 1,
       id: json['id']?.toString() ?? '',
@@ -89,6 +101,7 @@ class Reminder {
           ? DateTime.tryParse(json['endDate'].toString())
           : null,
       timesPerDay: parseTimes(json['timesPerDay'], parsedTime),
+      deletedTimes: parseDeletedTimes(json['deletedTimes']),
     );
   }
 
@@ -103,6 +116,14 @@ class Reminder {
     DateTime current = DateTime(time.year, time.month, time.day);
     DateTime end = endDate ?? current.add(const Duration(days: 30));
 
+    // Chuyển deletedTimes thành Set để dễ so sánh
+    final deletedSet = deletedTimes.map((dt) {
+      final parsed = DateTime.tryParse(dt);
+      if (parsed == null) return null;
+      // Chỉ so sánh ngày, giờ, phút (bỏ qua giây và milliseconds)
+      return DateTime(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute);
+    }).whereType<DateTime>().toSet();
+
     for (
       DateTime d = current;
       !d.isAfter(end);
@@ -114,7 +135,20 @@ class Reminder {
         if (parts.length == 2) {
           final hour = int.tryParse(parts[0]) ?? 0;
           final minute = int.tryParse(parts[1]) ?? 0;
-          schedule.add(DateTime(d.year, d.month, d.day, hour, minute));
+          final scheduleTime = DateTime(d.year, d.month, d.day, hour, minute);
+          
+          // Chỉ thêm vào schedule nếu chưa bị xóa
+          final normalizedTime = DateTime(
+            scheduleTime.year,
+            scheduleTime.month,
+            scheduleTime.day,
+            scheduleTime.hour,
+            scheduleTime.minute,
+          );
+          
+          if (!deletedSet.contains(normalizedTime)) {
+            schedule.add(scheduleTime);
+          }
         }
       }
     }
@@ -207,6 +241,50 @@ class ReminderStorage {
     // ✅ Hủy thông báo
     await NotificationService().cancelReminderNotifications(id);
     print("🔕 Đã hủy thông báo cho reminder: $id");
+  }
+
+  /// 🔸 Xóa một lần uống thuốc cụ thể (thêm vào deletedTimes)
+  static Future<void> deleteScheduleTime(String reminderId, DateTime scheduleTime) async {
+    final reminders = await loadReminders();
+    final reminderIndex = reminders.indexWhere((r) => r.id == reminderId);
+    
+    if (reminderIndex == -1) {
+      print("⚠️ Không tìm thấy reminder với id: $reminderId");
+      return;
+    }
+
+    final reminder = reminders[reminderIndex];
+    final timeString = scheduleTime.toIso8601String();
+    
+    // Thêm vào deletedTimes nếu chưa có
+    if (!reminder.deletedTimes.contains(timeString)) {
+      final updatedReminder = Reminder(
+        id: reminder.id,
+        title: reminder.title,
+        description: reminder.description,
+        dosage: reminder.dosage,
+        time: reminder.time,
+        frequency: reminder.frequency,
+        intervalDays: reminder.intervalDays,
+        endDate: reminder.endDate,
+        timesPerDay: reminder.timesPerDay,
+        drawer: reminder.drawer,
+        deletedTimes: [...reminder.deletedTimes, timeString],
+      );
+      
+      reminders[reminderIndex] = updatedReminder;
+      await _saveReminders(reminders);
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final firebaseService = FirebaseReminderService();
+        await firebaseService.updateReminder(updatedReminder);
+      }
+
+      // Cập nhật thông báo
+      await NotificationService().scheduleReminder(updatedReminder);
+      print("🗑️ Đã xóa lịch trình: ${reminder.title} - ${scheduleTime.toIso8601String()}");
+    }
   }
 
   static Future<void> rescheduleAllNotifications() async {
