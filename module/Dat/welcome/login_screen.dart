@@ -27,7 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await _auth.setLanguageCode('vi');
-      // 1️⃣ Đăng nhập Firebase Auth
+      //  Đăng nhập Firebase Auth
       UserCredential userCredential =
       await _auth.signInWithEmailAndPassword(
         email: emailController.text.trim(),
@@ -36,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final uid = userCredential.user!.uid;
 
-      // 2️⃣ Kiểm tra user có tồn tại trong Firestore
+      //  Kiểm tra user có tồn tại trong Firestore
       final userDoc = await _firestore.collection('users').doc(uid).get();
 
       if (!userDoc.exists) {
@@ -46,15 +46,15 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
 
-      // ✅ 3️⃣ Sau khi đăng nhập thành công, đồng bộ dữ liệu riêng cho user
+      //  Sau khi đăng nhập thành công, đồng bộ dữ liệu riêng cho user
       final firebaseService = FirebaseReminderService();
       await firebaseService.syncFromFirebaseToLocal();
       await firebaseService.syncFromFirebaseToRTDB();
-      // ✅ Bật chế độ realtime sync sau khi đăng nhập
+      //  Bật chế độ realtime sync sau khi đăng nhập
       firebaseService.initSyncForUser();
       print("✅ Đồng bộ dữ liệu user $uid thành công!");
 
-      // 4️⃣ Chuyển sang trang chính
+      //  Chuyển sang trang chính
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Đăng nhập thành công!')),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'welcomeback.dart';
-// import để điều hướng
+
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
