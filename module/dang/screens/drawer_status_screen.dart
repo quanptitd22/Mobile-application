@@ -12,19 +12,23 @@ class DrawerStatusScreen extends StatefulWidget {
 class _DrawerStatusScreenState extends State<DrawerStatusScreen> {
   final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
   Map<int, Map<String, dynamic>> drawerStatus = {};
+  Map<int, String> drawerControl = {
+    1: "close",
+    2: "close",
+    3: "close",
+  };
 
   @override
   void initState() {
     super.initState();
     _listenToDrawerData();
+    _listenToControlStatus();
   }
 
+  // 🟦 Lấy thông tin thuốc trong từng ngăn
   void _listenToDrawerData() {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      debugPrint("⚠️ Chưa có user đăng nhập");
-      return;
-    }
+    if (user == null) return;
 
     final userUid = user.uid;
     _dbRef.child('users/$userUid/reminders').onValue.listen((event) {
@@ -47,17 +51,74 @@ class _DrawerStatusScreenState extends State<DrawerStatusScreen> {
     });
   }
 
-  Future<void> _openDrawer(int drawerNumber) async {
+  // 🟩 Lấy trạng thái open/close của từng ngăn
+  void _listenToControlStatus() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final userUid = user.uid;
+
+    _dbRef.child('users/$userUid/control').onValue.listen((event) {
+      if (event.snapshot.value == null) return;
+
+      final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+
+      setState(() {
+        drawerControl[1] = data["drawer1"] ?? "close";
+        drawerControl[2] = data["drawer2"] ?? "close";
+        drawerControl[3] = data["drawer3"] ?? "close";
+      });
+    });
+  }
+
+  // 🟧 Toggle mở/đóng
+  Future<void> _toggleDrawer(int drawerNumber) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final userUid = user.uid;
+
+    String currentState = drawerControl[drawerNumber] ?? "close";
+    String newState = currentState == "close" ? "open" : "close";
+
     try {
-      await _dbRef.child('control/drawer$drawerNumber').set('open');
+      await _dbRef.child('users/$userUid/control/drawer$drawerNumber')
+          .set(newState);
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ Đã gửi lệnh mở ngăn $drawerNumber')),
+        SnackBar(content: Text('Đã chuyển ngăn $drawerNumber → $newState')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Lỗi khi gửi lệnh: $e')),
+        SnackBar(content: Text('Lỗi khi gửi lệnh: $e')),
       );
     }
+  }
+
+  // 🟦 Format thời gian từ "2025-11-18T14:57:00.000"
+  String _formatTime(String raw) {
+    try {
+      DateTime dt = DateTime.parse(raw);
+      return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  // 🟦 CHUYỂN timesPerDay thành List chuẩn
+  List<String> _extractTimes(dynamic rawTimes) {
+    if (rawTimes == null) return [];
+
+    if (rawTimes is List) {
+      return rawTimes.map((e) => e.toString()).toList();
+    }
+    if (rawTimes is Map) {
+      return rawTimes.values.map((e) => e.toString()).toList();
+    }
+    if (rawTimes is String) {
+      return [rawTimes];
+    }
+    return [];
   }
 
   @override
@@ -85,23 +146,25 @@ class _DrawerStatusScreenState extends State<DrawerStatusScreen> {
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: 3, // ✅ 3 ngăn thuốc
+        itemCount: 3,
         itemBuilder: (context, index) {
           int drawerNum = index + 1;
           var data = drawerStatus[drawerNum];
           bool hasPill = data != null;
+
+          // 🟦 SỬ DỤNG TIMESPERDAY
+          List<String> times =
+          _extractTimes(data != null ? data['timesPerDay'] : null);
 
           return AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(22),
-              color: hasPill ? Colors.white : Colors.grey[100],
+              color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: hasPill
-                      ? Colors.blueAccent.withOpacity(0.1)
-                      : Colors.grey.withOpacity(0.15),
+                  color: Colors.black.withOpacity(0.08),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
                 ),
@@ -114,20 +177,18 @@ class _DrawerStatusScreenState extends State<DrawerStatusScreen> {
                 children: [
                   CircleAvatar(
                     radius: 28,
-                    backgroundColor: hasPill
-                        ? const Color(0xFF4f7cff).withOpacity(0.15)
-                        : Colors.grey[300],
+                    backgroundColor: Colors.blue.withOpacity(0.12),
                     child: Icon(
                       hasPill
                           ? Icons.medication_rounded
                           : Icons.inventory_2_outlined,
                       size: 28,
-                      color: hasPill
-                          ? const Color(0xFF4f7cff)
-                          : Colors.grey,
+                      color: const Color(0xFF4f7cff),
                     ),
                   ),
                   const SizedBox(width: 16),
+
+                  // ===== Thông tin thuốc =====
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,47 +201,84 @@ class _DrawerStatusScreenState extends State<DrawerStatusScreen> {
                           ),
                         ),
                         const SizedBox(height: 6),
+
                         if (hasPill) ...[
-                          Text("Tên thuốc: ${data!['title']}",
-                              style: const TextStyle(fontSize: 15)),
-                          Text("Liều lượng: ${data['dosage']} viên",
-                              style: const TextStyle(fontSize: 15)),
-                          Text("Tần suất: ${data['frequency']}",
-                              style: const TextStyle(fontSize: 15)),
-                          Text("Thời gian: ${data['time']}",
-                              style: const TextStyle(fontSize: 14)),
+                          Text("Tên thuốc: ${data!['title']}"),
+                          Text("Liều lượng: ${data['dosage']} viên"),
+                          Text("Tần suất: ${data['frequency']}"),
+
+                          const SizedBox(height: 4),
+                          const Text(
+                            "Thời gian uống:",
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+
+                          // 🟦 HIỂN THỊ CHIP THỜI GIAN
+                          times.isNotEmpty
+                              ? Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: times.map((t) {
+                              return Chip(
+                                label: Text(
+                                  t,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                avatar: const Icon(
+                                  Icons.access_time,
+                                  size: 18,
+                                ),
+                                backgroundColor:
+                                const Color(0xFF4f7cff)
+                                    .withOpacity(0.12),
+                              );
+                            }).toList(),
+                          )
+                              : const Text(
+                            "Không có thời gian uống",
+                            style: TextStyle(color: Colors.grey),
+                          ),
                         ] else
-                          const Text("Trống",
-                              style: TextStyle(
-                                  fontSize: 15, color: Colors.grey)),
+                          const Text(
+                            "Trống",
+                            style: TextStyle(
+                                color: Colors.grey, fontSize: 14),
+                          ),
                       ],
                     ),
                   ),
+
                   const SizedBox(width: 12),
-                  hasPill
-                      ? ElevatedButton(
-                    onPressed: () => _openDrawer(drawerNum),
+
+                  // 🔵 Nút Mở / Đóng ngăn
+                  ElevatedButton(
+                    onPressed: () => _toggleDrawer(drawerNum),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4f7cff),
+                      backgroundColor:
+                      drawerControl[drawerNum] == "open"
+                          ? Colors.redAccent
+                          : const Color(0xFF4f7cff),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 10),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      elevation: 2,
                     ),
-                    child: const Text(
-                      'Mở ngăn',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600),
+                    child: Text(
+                      drawerControl[drawerNum] == "open"
+                          ? "Đóng"
+                          : "Mở",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  )
-                      : const Text(
-                    'Trống',
-                    style: TextStyle(
-                        color: Colors.redAccent,
-                        fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
