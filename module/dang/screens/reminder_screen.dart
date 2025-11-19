@@ -266,8 +266,38 @@ class _ReminderScreenState extends State<ReminderScreen> {
       });
     }
   }
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
 
-  void _saveReminder() {
+  Future<void> _saveReminder() async {
+    // Kiểm tra ngăn thuốc (drawer) chỉ chứa 1 thuốc
+    if (_selectedDrawer == null) {
+      _showError("Bạn chưa chọn ngăn thuốc!");
+      return;
+    }
+
+    final used = await ReminderStorage.isDrawerUsed(_selectedDrawer!);
+
+// Nếu đang tạo mới → chặn nếu ngăn đã có thuốc
+    if (used && widget.existingReminder == null) {
+      _showError("Ngăn $_selectedDrawer đã chứa thuốc khác!");
+      return;
+    }
+
+// Nếu đang sửa → chỉ chặn khi đổi sang ngăn đã có thuốc khác
+    if (used && widget.existingReminder != null) {
+      if (widget.existingReminder!.drawer != _selectedDrawer) {
+        _showError("Ngăn $_selectedDrawer đã có thuốc khác!");
+        return;
+      }
+    }
+
     if (_titleController.text.trim().isEmpty) {
       _showErrorSnackBar('Vui lòng nhập tên thuốc');
       return;
@@ -609,9 +639,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
 
               return Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                  ), // Thêm khoảng cách nhỏ
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
                   child: InkWell(
                     onTap: () {
                       setState(() {
@@ -627,11 +655,11 @@ class _ReminderScreenState extends State<ReminderScreen> {
                       decoration: BoxDecoration(
                         gradient: isSelected
                             ? LinearGradient(
-                                colors: [
-                                  Colors.teal.shade500,
-                                  Colors.teal.shade600,
-                                ],
-                              )
+                          colors: [
+                            Colors.teal.shade500,
+                            Colors.teal.shade600,
+                          ],
+                        )
                             : null,
                         color: isSelected ? null : Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(20),
@@ -640,17 +668,19 @@ class _ReminderScreenState extends State<ReminderScreen> {
                             : Border.all(color: Colors.grey.shade200),
                         boxShadow: isSelected
                             ? [
-                                BoxShadow(
-                                  color: Colors.teal.withOpacity(0.3),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ]
+                          BoxShadow(
+                            color: Colors.teal.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
                             : null,
                       ),
                       child: Center(
                         child: Text(
-                          'Ngăn $drawerNumber',
+                          drawerNumber == 4
+                              ? 'Khác'
+                              : 'Ngăn $drawerNumber',
                           style: TextStyle(
                             color: isSelected
                                 ? Colors.white
@@ -670,6 +700,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
       ),
     );
   }
+
 
   Widget _buildDateCard() {
     return Container(

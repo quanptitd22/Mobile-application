@@ -440,4 +440,10 @@ class ReminderStorage {
   /// Public wrapper to get a notification id for external callers
   static int notificationIdFor(String reminderId, DateTime time) =>
       _notificationIdFor(reminderId, time);
+
+  static Future<bool> isDrawerUsed(int drawerNumber) async {
+    final reminders = await loadReminders();
+    return reminders.any((r) => r.drawer == drawerNumber);
+  }
+
 }
