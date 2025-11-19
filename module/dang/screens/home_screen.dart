@@ -27,10 +27,10 @@ class _HomeScreenState extends State<HomeScreen> {
   // Danh sách lịch trình hôm nay thay vì reminders
   List<Map<String, dynamic>> _todaySchedules = [];
   final Map<String, ReminderStatus> _statuses = {};
-  
+
   int _currentIndex = 0;
   bool _isLoading = false;
-  
+
   // 📊 Biến lưu thống kê
   Map<String, int> _statistics = {
     'completed': 0,
@@ -49,36 +49,36 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 📅 Load lịch trình hôm nay
   Future<void> _loadTodaySchedules() async {
     setState(() => _isLoading = true);
-    
+
     try {
       // Đồng bộ từ Firebase trước
       await _firebaseService.syncFromFirebaseToLocal();
-      
+
       // Lấy tất cả lịch trình
       final allSchedules = await ReminderStorage.getAllSchedules();
-      
+
       // Lọc chỉ lấy lịch hôm nay
       final now = DateTime.now();
       final startOfDay = DateTime(now.year, now.month, now.day);
       final endOfDay = startOfDay.add(const Duration(days: 1));
-      
+
       final todaySchedules = allSchedules.where((schedule) {
         final time = schedule['time'] as DateTime;
         return time.isAfter(startOfDay.subtract(const Duration(seconds: 1))) &&
-               time.isBefore(endOfDay);
+            time.isBefore(endOfDay);
       }).toList();
-      
+
       // Sắp xếp theo thời gian
-      todaySchedules.sort((a, b) => 
-        (a['time'] as DateTime).compareTo(b['time'] as DateTime));
-      
+      todaySchedules.sort((a, b) =>
+          (a['time'] as DateTime).compareTo(b['time'] as DateTime));
+
       setState(() {
         _todaySchedules = todaySchedules;
       });
-      
+
       // Load trạng thái
       await _loadStatusesFromFirebase();
-      
+
       print("✅ Đã tải ${_todaySchedules.length} lịch trình hôm nay");
     } catch (e) {
       print("❌ Lỗi khi tải lịch trình hôm nay: $e");
@@ -113,16 +113,16 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final allSchedules = await ReminderStorage.getAllSchedules();
       final statuses = await _firebaseService.getAllReminderStatuses();
-      
+
       int completed = 0;
       int skipped = 0;
       int pending = 0;
-      
+
       for (var schedule in allSchedules) {
         final time = schedule['time'] as DateTime;
         final id = '${schedule['title']}_${time.toIso8601String()}';
         final status = statuses[id] ?? 'pending';
-        
+
         if (status == 'completed') {
           completed++;
         } else if (status == 'skipped') {
@@ -131,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
           pending++;
         }
       }
-      
+
       setState(() {
         _statistics = {
           'completed': completed,
@@ -187,14 +187,14 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 🛠️ Chỉnh sửa lịch trình
   Future<void> _editSchedule(Map<String, dynamic> schedule) async {
     final String? reminderId = schedule['reminderId'];
-    
+
     if (reminderId == null) {
       _showErrorSnackBar('Lỗi: Không tìm thấy ID của lịch trình');
       return;
     }
 
     final reminder = await ReminderStorage.getReminderById(reminderId);
-    
+
     if (reminder == null) {
       _showErrorSnackBar('Lỗi: Không thể tải lịch trình');
       return;
@@ -211,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await ReminderStorage.updateReminder(updatedReminder);
       await _loadTodaySchedules();
       await _loadStatistics();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -253,22 +253,24 @@ class _HomeScreenState extends State<HomeScreen> {
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.orange),
                 title: const Text('Xóa lịch trình hôm nay'),
-                subtitle: Text('Chỉ xóa lịch ${DateFormat('HH:mm').format(schedule['time'])}'),
+                subtitle: Text('Chỉ xóa lịch ${DateFormat('HH:mm').format(
+                    schedule['time'])}'),
                 onTap: () async {
                   Navigator.pop(context);
                   // Xóa trạng thái của lịch trình này
                   final time = schedule['time'] as DateTime;
                   final id = '${schedule['title']}_${time.toIso8601String()}';
-                  
+
                   try {
                     await _firebaseService.updateReminderStatus(id, 'deleted');
                     await _loadTodaySchedules();
                     await _loadStatistics();
-                    
+
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('✅ Đã xóa lịch trình ${DateFormat('HH:mm').format(time)}'),
+                          content: Text('✅ Đã xóa lịch trình ${DateFormat(
+                              'HH:mm').format(time)}'),
                           backgroundColor: Colors.orange.shade600,
                           behavior: SnackBarBehavior.floating,
                         ),
@@ -281,23 +283,25 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const Divider(),
               ListTile(
-                leading: const Icon(Icons.delete_forever, color: Colors.redAccent),
+                leading: const Icon(
+                    Icons.delete_forever, color: Colors.redAccent),
                 title: const Text('Xóa toàn bộ thuốc này'),
                 subtitle: const Text('Xóa tất cả lịch trình của thuốc này'),
                 onTap: () async {
                   Navigator.pop(context);
                   final reminderId = schedule['reminderId'];
-                  
+
                   if (reminderId != null) {
                     try {
                       await ReminderStorage.deleteReminder(reminderId);
                       await _loadTodaySchedules();
                       await _loadStatistics();
-                      
+
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('✅ Đã xóa toàn bộ: ${schedule['title']}'),
+                            content: Text(
+                                '✅ Đã xóa toàn bộ: ${schedule['title']}'),
                             backgroundColor: Colors.red.shade600,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -326,13 +330,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _markAsCompleted(Map<String, dynamic> schedule) async {
     final time = schedule['time'] as DateTime;
     final id = '${schedule['title']}_${time.toIso8601String()}';
-    
+
     setState(() => _statuses[id] = ReminderStatus.completed);
-    
+
     try {
       await _firebaseService.updateReminderStatus(id, 'completed');
       await _loadStatistics();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -351,13 +355,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _markAsSkipped(Map<String, dynamic> schedule) async {
     final time = schedule['time'] as DateTime;
     final id = '${schedule['title']}_${time.toIso8601String()}';
-    
+
     setState(() => _statuses[id] = ReminderStatus.skipped);
-    
+
     try {
       await _firebaseService.updateReminderStatus(id, 'skipped');
       await _loadStatistics();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -737,8 +741,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatCard(
-      String value, String label, IconData icon, Color color) {
+  Widget _buildStatCard(String value, String label, IconData icon,
+      Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -819,14 +823,17 @@ class _HomeScreenState extends State<HomeScreen> {
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _todaySchedules.isEmpty
-                  ? _buildEmptyState()
-                  : Column(
-                      children: displayedSchedules.asMap().entries.map((entry) {
-                        int index = entry.key;
-                        var schedule = entry.value;
-                        return _buildScheduleItem(schedule, index);
-                      }).toList(),
-                    ),
+              ? _buildEmptyState()
+              : Column(
+            children: displayedSchedules
+                .asMap()
+                .entries
+                .map((entry) {
+              int index = entry.key;
+              var schedule = entry.value;
+              return _buildScheduleItem(schedule, index);
+            }).toList(),
+          ),
         ],
       ),
     );
@@ -837,86 +844,90 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(30),
-            topRight: Radius.circular(30),
-          ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue.shade600, Colors.purple.shade600],
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
-                ),
+      builder: (context) =>
+          Container(
+            height: MediaQuery
+                .of(context)
+                .size
+                .height * 0.8,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(30),
+                topRight: Radius.circular(30),
               ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(2),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blue.shade600, Colors.purple.shade600],
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30),
                     ),
                   ),
-                  const SizedBox(height: 15),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
                     children: [
-                      const Text(
-                        'Tất cả lịch trình hôm nay',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '${_todaySchedules.length} lịch',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                      const SizedBox(height: 15),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Tất cả lịch trình hôm nay',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '${_todaySchedules.length} lịch',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(20),
+                    itemCount: _todaySchedules.length,
+                    itemBuilder: (context, index) {
+                      final schedule = _todaySchedules[index];
+                      return _buildScheduleItem(schedule, index);
+                    },
+                  ),
+                ),
+              ],
             ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(20),
-                itemCount: _todaySchedules.length,
-                itemBuilder: (context, index) {
-                  final schedule = _todaySchedules[index];
-                  return _buildScheduleItem(schedule, index);
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
@@ -1079,26 +1090,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: status == ReminderStatus.completed
                             ? Colors.green.withOpacity(0.15)
                             : status == ReminderStatus.skipped
-                                ? Colors.orange.withOpacity(0.15)
-                                : Colors.blue.withOpacity(0.15),
+                            ? Colors.orange.withOpacity(0.15)
+                            : Colors.blue.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         status == ReminderStatus.completed
                             ? 'Đã uống'
                             : status == ReminderStatus.skipped
-                                ? 'Đã bỏ qua'
-                                : isInPast
-                                    ? 'Chờ uống'
-                                    : 'Sắp tới',
+                            ? 'Đã bỏ qua'
+                            : isInPast
+                            ? 'Chờ uống'
+                            : 'Sắp tới',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                           color: status == ReminderStatus.completed
                               ? Colors.green.shade600
                               : status == ReminderStatus.skipped
-                                  ? Colors.orange.shade600
-                                  : Colors.blue.shade600,
+                              ? Colors.orange.shade600
+                              : Colors.blue.shade600,
                         ),
                       ),
                     ),
@@ -1106,7 +1117,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            
+
             // Hiển thị nút hành động nếu lịch trong quá khứ và chưa được đánh dấu
             if (isInPast && status == ReminderStatus.pending) ...[
               const SizedBox(height: 12),
@@ -1141,42 +1152,43 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-            ] else if (!isInPast) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.blue.shade200,
-                    width: 1,
+            ] else
+              if (!isInPast) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.blue.shade200,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 18,
+                        color: Colors.blue.shade600,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Chưa đến giờ uống thuốc',
+                        style: TextStyle(
+                          color: Colors.blue.shade600,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.access_time,
-                      size: 18,
-                      color: Colors.blue.shade600,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Chưa đến giờ uống thuốc',
-                      style: TextStyle(
-                        color: Colors.blue.shade600,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
           ],
         ),
       ),
@@ -1207,24 +1219,56 @@ class _HomeScreenState extends State<HomeScreen> {
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-
-            if (index == 1) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const HistoryScreen()),
-              ).then((_) {
-                _loadTodaySchedules();
-                _loadStatistics();
+            // TAB 0 → HOME
+            if (index == 0) {
+              setState(() {
+                _currentIndex = 0;
               });
-            } else if (index == 2) {
+              return;
+            }
+
+            // TAB 1 → HISTORY
+            if (index == 1) {
+              setState(() {
+                _currentIndex = 1;
+              });
+
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const DrawerStatusScreen()),
-              );
+                  builder: (context) => const HistoryScreen(),
+                ),
+              ).then((_) {
+                // Reset tab sau khi quay về
+                setState(() {
+                  _currentIndex = 0;
+                });
+                _loadTodaySchedules();
+                _loadStatistics();
+              });
+
+              return;
+            }
+
+            // TAB 2 → DRAWER STATUS
+            if (index == 2) {
+              setState(() {
+                _currentIndex = 2;
+              });
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DrawerStatusScreen(),
+                ),
+              ).then((_) {
+                // Reset tab về home
+                setState(() {
+                  _currentIndex = 0;
+                });
+              });
+
+              return;
             }
           },
           selectedItemColor: Colors.blue.shade600,

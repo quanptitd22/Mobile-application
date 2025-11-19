@@ -276,27 +276,33 @@ class _ReminderScreenState extends State<ReminderScreen> {
   }
 
   Future<void> _saveReminder() async {
-    // Kiểm tra ngăn thuốc (drawer) chỉ chứa 1 thuốc
+    // Kiểm tra ngăn thuốc đã chọn
     if (_selectedDrawer == null) {
       _showError("Bạn chưa chọn ngăn thuốc!");
       return;
     }
 
-    final used = await ReminderStorage.isDrawerUsed(_selectedDrawer!);
+    final drawer = _selectedDrawer!;
+    final isExternalDrawer = drawer == 0; // drawer 4 = Khác
 
-// Nếu đang tạo mới → chặn nếu ngăn đã có thuốc
-    if (used && widget.existingReminder == null) {
-      _showError("Ngăn $_selectedDrawer đã chứa thuốc khác!");
-      return;
-    }
+    // ⚠️ Chỉ kiểm tra trùng ngăn cho ngăn 1–3
+    if (!isExternalDrawer) {
+      final used = await ReminderStorage.isDrawerUsed(drawer);
 
-// Nếu đang sửa → chỉ chặn khi đổi sang ngăn đã có thuốc khác
-    if (used && widget.existingReminder != null) {
-      if (widget.existingReminder!.drawer != _selectedDrawer) {
-        _showError("Ngăn $_selectedDrawer đã có thuốc khác!");
+      if (used && widget.existingReminder == null) {
+        _showError("Ngăn $drawer đã chứa thuốc khác!");
         return;
       }
+
+      if (used && widget.existingReminder != null) {
+        if (widget.existingReminder!.drawer != drawer) {
+          _showError("Ngăn $drawer đã có thuốc khác!");
+          return;
+        }
+      }
     }
+
+    // ---- GIỮ NGUYÊN TOÀN BỘ CODE BÊN DƯỚI ----
 
     if (_titleController.text.trim().isEmpty) {
       _showErrorSnackBar('Vui lòng nhập tên thuốc');
@@ -308,17 +314,14 @@ class _ReminderScreenState extends State<ReminderScreen> {
       return;
     }
 
-    // Kiểm tra ngày bắt đầu không nằm trong quá khứ
     final now = DateTime.now();
     if (_startDate.isBefore(DateTime(now.year, now.month, now.day))) {
       _showErrorSnackBar('Ngày bắt đầu không thể nằm trong quá khứ');
       return;
     }
 
-    // Kiểm tra tất cả các mốc thời gian
     List<String> invalidTimes = [];
     for (var time in _times) {
-      // Tạo DateTime đầy đủ với ngày và giờ để so sánh
       var fullDateTime = DateTime(
         _startDate.year,
         _startDate.month,
@@ -350,8 +353,8 @@ class _ReminderScreenState extends State<ReminderScreen> {
     final timesPerDay = _times
         .map(
           (t) =>
-              '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}',
-        )
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}',
+    )
         .toList();
 
     int interval = 1;
@@ -360,25 +363,22 @@ class _ReminderScreenState extends State<ReminderScreen> {
     switch (_selectedFrequency) {
       case 'Hằng ngày':
         interval = 1;
-        endDate = _startDate.add(Duration(days: _durationDays -1 ));
+        endDate = _startDate.add(Duration(days: _durationDays - 1));
         break;
       case 'Cách ngày':
         interval = 2;
-        endDate = _startDate.add(Duration(days: _durationDays -1 ));
+        endDate = _startDate.add(Duration(days: _durationDays - 1));
         break;
       case 'Một lần':
         interval = 1;
-        // For one-time reminders, endDate == startDate so generateSchedule yields only that day
         endDate = DateTime(_startDate.year, _startDate.month, _startDate.day);
         break;
       case 'Theo số ngày':
-        // Lịch uống thuốc sẽ kéo dài từ ngày bắt đầu đến ngày kết thúc (mỗi ngày một lần)
-        interval = 1; // Hằng ngày trong khoảng thời gian đã chọn
-        endDate = _startDate.add(Duration(days: _customIntervalDays -1 ));
+        interval = 1;
+        endDate = _startDate.add(Duration(days: _customIntervalDays - 1));
         break;
     }
 
-    // Update times to use selected start date
     final updatedTimes = timesPerDay.map((timeStr) {
       final parts = timeStr.split(':');
       if (parts.length == 2) {
@@ -396,23 +396,23 @@ class _ReminderScreenState extends State<ReminderScreen> {
     }).toList();
 
     final reminder = Reminder(
-      id:
-          widget.existingReminder?.id ??
+      id: widget.existingReminder?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
       dosage: _selectedQuantity,
-      time: updatedTimes.first, // Use updated time with selected date
+      time: updatedTimes.first,
       frequency: _selectedFrequency,
       intervalDays: interval,
       endDate: endDate,
       timesPerDay: timesPerDay,
-      drawer: _selectedDrawer,
+      drawer: drawer,
       deletedTimes: widget.existingReminder?.deletedTimes ?? [],
     );
 
     Navigator.pop(context, reminder);
   }
+
 
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -634,7 +634,8 @@ class _ReminderScreenState extends State<ReminderScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(4, (index) {
-              final drawerNumber = index + 1;
+              // ✔ Chỉ sửa chỗ này
+              final drawerNumber = (index == 3) ? 0 : index + 1;
               final isSelected = _selectedDrawer == drawerNumber;
 
               return Expanded(
@@ -678,7 +679,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          drawerNumber == 4
+                          drawerNumber == 0
                               ? 'Khác'
                               : 'Ngăn $drawerNumber',
                           style: TextStyle(
